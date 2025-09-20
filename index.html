@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Photo Frenzy</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Stock Photo Frenzy</h1>
+            <p>Guess words in the image title to reveal it!</p>
+        </header>
+        
+        <main>
+            <!-- Game Stats -->
+            <div class="game-stats">
+                <div class="stat-banner score-banner">
+                    <span class="stat-label">Score:</span>
+                    <span id="score" class="stat-value">0</span>
+                </div>
+                <div class="stat-banner timer-banner">
+                    <span class="stat-label">Time Left:</span>
+                    <span id="timer" class="stat-value timer-value">1:00</span>
+                </div>
+            </div>
+            
+            <!-- Game Controls -->
+            <div class="controls">
+                <div class="difficulty-buttons">
+                    <button id="easyModeBtn" class="btn-primary btn-easy">
+                        <span class="btn-text">Easy Mode</span>
+                        <span class="btn-loading" style="display: none;">Loading...</span>
+                    </button>
+                    <button id="hardModeBtn" class="btn-primary btn-hard">
+                        <span class="btn-text">Hard Mode</span>
+                        <span class="btn-loading" style="display: none;">Loading...</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Image Container -->
+            <div class="image-container">
+                <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Loading your challenge image...</p>
+                </div>
+                
+                <div id="imageDisplay" class="image-display" style="display: none;">
+                    <img id="randomImage" src="" alt="Random stock photo">
+                    <div class="image-info">
+                        <h3 id="imageTitle">_ _ _ _ _ _ _ _ _ _ _</h3>
+                        <div class="image-meta">
+                            <span id="imageId">ID: </span>
+                            <span id="imageContributor">Contributor: </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="errorMessage" class="error-message" style="display: none;">
+                    <h3>Oops! Something went wrong</h3>
+                    <p id="errorText">Failed to load image. Please try again.</p>
+                </div>
+                
+                <div id="welcomeMessage" class="welcome-message">
+                    <h3>Welcome to the Stock Photo Frenzy!</h3>
+                    <p>Choose your difficulty mode to get started! In Easy Mode, only 3 words will be hidden. In Hard Mode, all words are hidden. Each correct guess reveals that word and gives you points!</p>
+                </div>
+            </div>
+            
+            <!-- Guessing Interface -->
+            <div id="guessingInterface" class="guessing-interface" style="display: none;">
+                <div class="guess-input-container">
+                    <input type="text" id="guessInput" placeholder="Enter a word to guess..." maxlength="20">
+                    <button id="guessBtn" class="btn-guess">Guess</button>
+                    <button id="forfeitBtn" class="btn-forfeit">Forfeit</button>
+                </div>
+                <div class="guess-feedback">
+                    <p id="guessFeedback" class="feedback-text"></p>
+                </div>
+                <div class="guessed-words">
+                    <h4>Guessed Words:</h4>
+                    <div id="guessedWordsList" class="words-list"></div>
+                </div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>Powered by <a href="https://www.shutterstock.com" target="_blank">Shutterstock API</a></p>
+        </footer>
+    </div>
+    
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
