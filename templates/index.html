@@ -10,9 +10,9 @@
     </header>
     
     <main>
-        <div class="welcome-message">
+            <div class="welcome-message">
             <h3>Welcome to Stock Photo Frenzy!</h3>
-            <p>Choose your game mode to get started!</p>
+            <p class="welcome-text">Choose your game mode to get started!</p>
             
             <div class="single-player-section">
                 <div class="phrase-input-section">
@@ -20,15 +20,22 @@
                     <input type="text" id="single-player-phrase" placeholder="e.g., 'sunset beach', 'city skyline'..." maxlength="50">
                     <p class="phrase-hint">Leave empty for random photos</p>
                 </div>
+                <div class="difficulty-selection-single">
+                    <h5>Select Difficulty:</h5>
+                    <div class="difficulty-buttons">
+                        <button class="btn-difficulty btn-easy" onclick="selectSinglePlayerDifficulty('easy')">Easy (3 words hidden)</button>
+                        <button class="btn-difficulty btn-hard active" onclick="selectSinglePlayerDifficulty('hard')">Hard (All words hidden)</button>
+                    </div>
+                </div>
                 <div class="game-mode-buttons">
-                    <a href="{{ url_for('game') }}" class="btn-primary btn-single" onclick="storeSinglePlayerPhrase(event)">
+                    <a href="{{ url_for('game') }}" class="btn-primary btn-single" onclick="storeSinglePlayerSettings(event)">
                         <span class="btn-text">Single Player</span>
                     </a>
                 </div>
             </div>
             
             <div class="multiplayer-section">
-                <h4>Multiplayer Modes</h4>
+                <h4 class="section-title">Multiplayer Modes</h4>
                 <div class="mode-selection">
                     <div class="mode-option" onclick="selectMode('free-for-all')">
                         <h5>Free-for-All</h5>
@@ -103,10 +110,24 @@ function selectDifficulty(difficulty) {
     document.getElementById('selected-difficulty').value = selectedDifficulty;
 }
 
-function storeSinglePlayerPhrase(event) {
+function selectSinglePlayerDifficulty(difficulty) {
+    // Update UI
+    document.querySelectorAll('.difficulty-selection-single .btn-difficulty').forEach(btn => btn.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    
+    // Store difficulty
+    sessionStorage.setItem('single_player_difficulty', difficulty);
+}
+
+function storeSinglePlayerSettings(event) {
     const phrase = document.getElementById('single-player-phrase').value.trim();
     if (phrase) {
         sessionStorage.setItem('single_player_phrase', phrase);
+    }
+    
+    // Ensure difficulty is set (default to hard if not selected)
+    if (!sessionStorage.getItem('single_player_difficulty')) {
+        sessionStorage.setItem('single_player_difficulty', 'hard');
     }
 }
 </script>

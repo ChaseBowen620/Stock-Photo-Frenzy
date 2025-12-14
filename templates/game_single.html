@@ -22,6 +22,10 @@
                 <span class="stat-label">Round:</span>
                 <span id="round" class="stat-value">1/5</span>
             </div>
+            <div class="stat-banner timer-banner">
+                <span class="stat-label">Time:</span>
+                <span id="timer" class="stat-value timer-value">1:00</span>
+            </div>
         </div>
         
         <div class="image-container">
@@ -46,6 +50,7 @@
             <div class="guess-input-container">
                 <input type="text" id="guessInput" placeholder="Enter a word to guess..." maxlength="20">
                 <button id="guessBtn" class="btn-guess">Guess</button>
+                <button id="forfeitBtn" class="btn-forfeit">Forfeit</button>
             </div>
             <div class="guess-feedback">
                 <p id="guessFeedback" class="feedback-text"></p>
@@ -60,12 +65,18 @@ let totalScore = 0;
 let currentImage = null;
 let originalTitle = '';
 let titleWords = [];
+let easyModeHiddenWords = []; // Words to hide in easy mode
 let revealedWords = new Set();
 let guessedWords = new Set();
+let timeLeft = 60;
+let timerInterval = null;
+let isForfeited = false;
+let difficulty = 'hard'; // Get from sessionStorage or default to hard
 
 async function startRound() {
     if (currentRound >= 5) {
         // Game finished
+        stopTimer();
         sessionStorage.setItem('final_score', totalScore);
         window.location.href = '/results';
         return;
@@ -78,16 +89,21 @@ async function startRound() {
     // Reset round state
     revealedWords.clear();
     guessedWords.clear();
+    isForfeited = false;
+    timeLeft = 60;
+    updateTimerDisplay();
+    resetForfeitButton();
     document.getElementById('loadingSpinner').style.display = 'block';
     document.getElementById('imageDisplay').style.display = 'none';
     document.getElementById('guessingInterface').style.display = 'none';
     
     try {
-        // Get phrase from session storage
+        // Get phrase and difficulty from session storage
         const phrase = sessionStorage.getItem('single_player_phrase') || '';
-        let imageUrl = '/api/get-image';
+        const difficulty = sessionStorage.getItem('single_player_difficulty') || 'hard';
+        let imageUrl = `/api/get-image?difficulty=${difficulty}`;
         if (phrase) {
-            imageUrl += `?query=${encodeURIComponent(phrase)}`;
+            imageUrl += `&query=${encodeURIComponent(phrase)}`;
             document.getElementById('phrase-display').style.display = 'block';
             document.getElementById('current-phrase').textContent = phrase;
         }
@@ -111,7 +127,14 @@ async function startRound() {
 function setupGame(image) {
     currentImage = image;
     originalTitle = image.title;
-    titleWords = image.title_words;
+    titleWords = image.title_words; // All guessable words (for validation)
+    
+    // For easy mode, store which words to hide
+    if (image.easy_mode_hidden_words && image.easy_mode_hidden_words.length > 0) {
+        easyModeHiddenWords = image.easy_mode_hidden_words;
+    } else {
+        easyModeHiddenWords = [];
+    }
     
     // Display image
     document.getElementById('randomImage').src = image.url;
@@ -123,6 +146,9 @@ function setupGame(image) {
     document.getElementById('imageDisplay').style.display = 'block';
     document.getElementById('guessingInterface').style.display = 'block';
     document.getElementById('guessInput').focus();
+    
+    // Start the timer
+    startTimer();
 }
 
 function displayHiddenTitle() {
@@ -131,8 +157,11 @@ function displayHiddenTitle() {
         .split(/\s+/)
         .filter(word => word.length > 0);
     
+    // In easy mode, only hide the easyModeHiddenWords
+    const wordsToHide = easyModeHiddenWords.length > 0 ? easyModeHiddenWords : titleWords;
+    
     const displayWords = allWords.map(word => {
-        if (titleWords.includes(word)) {
+        if (wordsToHide.includes(word)) {
             if (revealedWords.has(word)) {
                 return word;
             } else {
@@ -154,6 +183,8 @@ function displayHiddenTitle() {
 }
 
 function makeGuess() {
+    if (isForfeited) return;
+    
     const guess = document.getElementById('guessInput').value.trim().toLowerCase();
     
     if (!guess || guess.length < 3) {
@@ -169,31 +200,42 @@ function makeGuess() {
     
     guessedWords.add(guess);
     
+    // Check if word is in titleWords (all guessable words)
     const foundWords = titleWords.filter(word => word === guess);
     
     if (foundWords.length > 0) {
-        foundWords.forEach(word => {
-            revealedWords.add(word);
-        });
+        // In easy mode, only reveal if it's one of the hidden words
+        const wordsToReveal = easyModeHiddenWords.length > 0 ? easyModeHiddenWords : titleWords;
+        const relevantWords = foundWords.filter(word => wordsToReveal.includes(word));
         
-        const points = foundWords.length * 10;
-        totalScore += points;
-        updateScore();
-        
-        showFeedback(`Great! Found "${guess}" (${foundWords.length} time${foundWords.length > 1 ? 's' : ''})! +${points} points`, 'correct');
-        
-        displayHiddenTitle();
-        
-        // Check if all words revealed
-        if (revealedWords.size === titleWords.length) {
+        if (relevantWords.length > 0) {
+            relevantWords.forEach(word => {
+                revealedWords.add(word);
+            });
+            
+            const points = relevantWords.length * 10;
+            totalScore += points;
+            updateScore();
+            
+            showFeedback(`Great! Found "${guess}" (${relevantWords.length} time${relevantWords.length > 1 ? 's' : ''})! +${points} points`, 'correct');
+            
+            displayHiddenTitle();
+            
+            // Check if all words revealed
+            if (revealedWords.size === wordsToReveal.length) {
+            stopTimer();
             totalScore += 100; // Completion bonus
             updateScore();
             showFeedback('Perfect! All words found! +100 completion bonus!', 'correct');
             
-            // Move to next round after delay
-            setTimeout(() => {
-                startRound();
-            }, 3000);
+                // Move to next round after delay
+                setTimeout(() => {
+                    startRound();
+                }, 3000);
+            }
+        } else {
+            // Word is in title but not one of the words to reveal in easy mode
+            showFeedback(`"${guess}" is in the title, but not one of the hidden words!`, 'incorrect');
         }
     } else {
         showFeedback(`"${guess}" is not in the title. Try again!`, 'incorrect');
@@ -212,7 +254,78 @@ function showFeedback(message, type) {
     feedback.className = `feedback-text ${type}`;
 }
 
+function forfeitGame() {
+    if (isForfeited) return;
+    
+    isForfeited = true;
+    stopTimer();
+    
+    // Reveal all words
+    titleWords.forEach(word => revealedWords.add(word));
+    displayHiddenTitle();
+    
+    document.getElementById('forfeitBtn').disabled = true;
+    showFeedback('Game forfeited! The title has been revealed.', 'incorrect');
+    
+    // Change forfeit button to "Next Round"
+    document.getElementById('forfeitBtn').textContent = 'Next Round';
+    document.getElementById('forfeitBtn').style.background = 'linear-gradient(45deg, #27ae60, #2ecc71)';
+    document.getElementById('forfeitBtn').style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.4)';
+    document.getElementById('forfeitBtn').disabled = false;
+    document.getElementById('forfeitBtn').onclick = function() {
+        startRound();
+    };
+}
+
+function startTimer() {
+    stopTimer(); // Clear any existing timer
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay();
+        
+        if (timeLeft <= 0) {
+            forfeitGame();
+        }
+    }, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+function updateTimerDisplay() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    const timerElement = document.getElementById('timer');
+    timerElement.textContent = timeString;
+    
+    timerElement.className = 'stat-value timer-value';
+    if (timeLeft <= 10) {
+        timerElement.classList.add('danger');
+    } else if (timeLeft <= 30) {
+        timerElement.classList.add('warning');
+    }
+}
+
+function resetForfeitButton() {
+    const forfeitBtn = document.getElementById('forfeitBtn');
+    forfeitBtn.textContent = 'Forfeit';
+    forfeitBtn.style.background = 'linear-gradient(45deg, #e74c3c, #c0392b)';
+    forfeitBtn.style.boxShadow = '0 4px 15px rgba(231, 76, 60, 0.4)';
+    forfeitBtn.disabled = false;
+    forfeitBtn.onclick = forfeitGame;
+}
+
+// Get difficulty from sessionStorage
+difficulty = sessionStorage.getItem('single_player_difficulty') || 'hard';
+
 document.getElementById('guessBtn').addEventListener('click', makeGuess);
+document.getElementById('forfeitBtn').addEventListener('click', forfeitGame);
 document.getElementById('guessInput').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         makeGuess();

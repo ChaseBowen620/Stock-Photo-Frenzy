@@ -174,7 +174,9 @@ def game():
         if not lobby:
             return redirect(url_for('index'))
         
-        if lobby.status == 'waiting':
+        # Allow mobile users to access game page even when waiting (they'll see waiting screen)
+        # But redirect host to lobby if waiting
+        if lobby.status == 'waiting' and not is_mobile:
             return redirect(url_for('lobby'))
         
         # Use mobile template for mobile devices in multiplayer
