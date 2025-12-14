@@ -13,10 +13,18 @@
         <div class="welcome-message">
             <h3>Welcome to Stock Photo Frenzy!</h3>
             <p>Choose your game mode to get started!</p>
-            <div class="game-mode-buttons">
-                <a href="{{ url_for('game') }}" class="btn-primary btn-single">
-                    <span class="btn-text">Single Player</span>
-                </a>
+            
+            <div class="single-player-section">
+                <div class="phrase-input-section">
+                    <label for="single-player-phrase">Enter a search phrase (optional):</label>
+                    <input type="text" id="single-player-phrase" placeholder="e.g., 'sunset beach', 'city skyline'..." maxlength="50">
+                    <p class="phrase-hint">Leave empty for random photos</p>
+                </div>
+                <div class="game-mode-buttons">
+                    <a href="{{ url_for('game') }}" class="btn-primary btn-single" onclick="storeSinglePlayerPhrase(event)">
+                        <span class="btn-text">Single Player</span>
+                    </a>
+                </div>
             </div>
             
             <div class="multiplayer-section">
@@ -93,6 +101,13 @@ function selectDifficulty(difficulty) {
     // Update form
     document.getElementById('selected-mode').value = selectedMode;
     document.getElementById('selected-difficulty').value = selectedDifficulty;
+}
+
+function storeSinglePlayerPhrase(event) {
+    const phrase = document.getElementById('single-player-phrase').value.trim();
+    if (phrase) {
+        sessionStorage.setItem('single_player_phrase', phrase);
+    }
 }
 </script>
 {% endblock %}

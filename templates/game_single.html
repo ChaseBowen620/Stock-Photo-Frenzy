@@ -7,6 +7,9 @@
     <header>
         <h1>Stock Photo Frenzy</h1>
         <p>Round <span id="round-number">1</span> of 5</p>
+        <div class="phrase-display" id="phrase-display" style="display: none;">
+            <p>Search phrase: <span id="current-phrase"></span></p>
+        </div>
     </header>
     
     <main>
@@ -80,7 +83,16 @@ async function startRound() {
     document.getElementById('guessingInterface').style.display = 'none';
     
     try {
-        const response = await fetch('/api/get-image');
+        // Get phrase from session storage
+        const phrase = sessionStorage.getItem('single_player_phrase') || '';
+        let imageUrl = '/api/get-image';
+        if (phrase) {
+            imageUrl += `?query=${encodeURIComponent(phrase)}`;
+            document.getElementById('phrase-display').style.display = 'block';
+            document.getElementById('current-phrase').textContent = phrase;
+        }
+        
+        const response = await fetch(imageUrl);
         const data = await response.json();
         
         if (data.error) {

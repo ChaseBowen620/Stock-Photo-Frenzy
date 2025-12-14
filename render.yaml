@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: stock-photo-frenzy
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT src.app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SHUTTERSTOCK_BASE_URL
+        value: https://api.shutterstock.com/v2
+      - key: SHUTTERSTOCK_ACCESS_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stock-photo-frenzy-db
+          property: connectionString
+
+databases:
+  - name: stock-photo-frenzy-db
+    databaseName: stock_photo_frenzy
+    user: stock_photo_frenzy_user
+

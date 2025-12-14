@@ -26,6 +26,9 @@ if not database_url:
 elif database_url.startswith('postgres://'):
     # Handle Render's postgres:// URL format (needs postgresql://)
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
+elif database_url.startswith('postgresql://'):
+    # Already correct format
+    pass
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -188,14 +191,113 @@ def game():
 def get_image():
     """Get a random image from Shutterstock API"""
     try:
-        random_term = random.choice(SEARCH_TERMS)
+        # Get query phrase from request (for single player or competitive mode)
+        query_phrase = request.args.get('query', '').strip()
+        difficulty = request.args.get('difficulty', 'hard')
+        per_page = int(request.args.get('per_page', 1))  # For competitive round 5
         
+        # Use provided phrase or fall back to random
+        if query_phrase:
+            search_query = query_phrase
+        else:
+            search_query = random.choice(SEARCH_TERMS)
+        
+        response = requests.get(
+            f"{SHUTTERSTOCK_BASE_URL}/images/search",
+            params={
+                'query': search_query,
+                'sort': 'random',
+                'per_page': per_page,
+                'view': 'full'
+            },
+            headers={
+                'Authorization': f'Bearer {SHUTTERSTOCK_ACCESS_TOKEN}',
+                'Content-Type': 'application/json'
+            }
+        )
+        
+        if not response.ok:
+            # Fall back to random search term
+            return get_random_image_fallback(difficulty)
+        
+        data = response.json()
+        
+        if not data.get('data') or len(data['data']) == 0:
+            # Fall back to random search term
+            return get_random_image_fallback(difficulty, per_page)
+        
+        # If per_page > 1, return multiple images (for competitive round 5)
+        if per_page > 1:
+            images = data['data'][:per_page]
+            processed_images = []
+            for img in images:
+                try:
+                    processed_images.append(process_image(img, difficulty))
+                except Exception as e:
+                    print(f'Error processing image: {str(e)}')
+                    continue  # Skip invalid images
+            
+            if len(processed_images) == 0:
+                # All images failed, fall back to random
+                return get_random_image_fallback(difficulty, 1)
+            
+            return jsonify({
+                'success': True,
+                'images': processed_images
+            })
+        
+        image = data['data'][0]
+        return jsonify({
+            'success': True,
+            'image': process_image(image, difficulty)
+        })
+    
+    except Exception as e:
+        print(f'Error getting image: {str(e)}')
+        # Fall back to random search term
+        return get_random_image_fallback(difficulty)
+
+def process_image(image, difficulty='hard'):
+    """Process a single image and return its data"""
+    # Get best image URL
+    image_url = None
+    asset_sizes = ['huge', 'large', 'medium', 'small', 'preview']
+    for size in asset_sizes:
+        if image.get('assets', {}).get(size, {}).get('url'):
+            image_url = image['assets'][size]['url']
+            break
+    
+    if not image_url:
+        raise ValueError('No suitable image URL found')
+    
+    # Extract words from title
+    title = image.get('description', 'Beautiful Stock Photo')
+    title_words = extract_words(title)
+    
+    # For easy mode, select 3 random words to hide
+    easy_mode_hidden_words = []
+    if difficulty == 'easy' and len(title_words) >= 3:
+        easy_mode_hidden_words = random.sample(title_words, min(3, len(title_words)))
+    
+    return {
+        'id': image.get('id'),
+        'url': image_url,
+        'title': title,
+        'title_words': title_words,
+        'easy_mode_hidden_words': easy_mode_hidden_words,
+        'contributor': image.get('contributor', {}).get('display_name', 'Unknown')
+    }
+
+def get_random_image_fallback(difficulty='hard', per_page=1):
+    """Fall back to random search term if custom query fails"""
+    try:
+        random_term = random.choice(SEARCH_TERMS)
         response = requests.get(
             f"{SHUTTERSTOCK_BASE_URL}/images/search",
             params={
                 'query': random_term,
                 'sort': 'random',
-                'per_page': 1,
+                'per_page': per_page,
                 'view': 'full'
             },
             headers={
@@ -212,44 +314,22 @@ def get_image():
         if not data.get('data') or len(data['data']) == 0:
             return jsonify({'error': 'No images found'}), 404
         
+        if per_page > 1:
+            images = data['data'][:per_page]
+            return jsonify({
+                'success': True,
+                'images': [process_image(img, difficulty) for img in images]
+            })
+        
         image = data['data'][0]
-        
-        # Get best image URL
-        image_url = None
-        asset_sizes = ['huge', 'large', 'medium', 'small', 'preview']
-        for size in asset_sizes:
-            if image.get('assets', {}).get(size, {}).get('url'):
-                image_url = image['assets'][size]['url']
-                break
-        
-        if not image_url:
-            return jsonify({'error': 'No suitable image URL found'}), 404
-        
-        # Extract words from title
-        title = image.get('description', 'Beautiful Stock Photo')
-        title_words = extract_words(title)
-        
-        # For easy mode, select 3 random words to hide
-        difficulty = request.args.get('difficulty', 'hard')
-        easy_mode_hidden_words = []
-        if difficulty == 'easy' and len(title_words) >= 3:
-            easy_mode_hidden_words = random.sample(title_words, min(3, len(title_words)))
-        
         return jsonify({
             'success': True,
-            'image': {
-                'id': image.get('id'),
-                'url': image_url,
-                'title': title,
-                'title_words': title_words,
-                'easy_mode_hidden_words': easy_mode_hidden_words,
-                'contributor': image.get('contributor', {}).get('display_name', 'Unknown')
-            }
+            'image': process_image(image, difficulty)
         })
-    
     except Exception as e:
-        print(f'Error getting image: {str(e)}')
+        print(f'Error in fallback: {str(e)}')
         return jsonify({'error': str(e)}), 500
+    
 
 @app.route('/api/lobby/<lobby_id>/status')
 def lobby_status(lobby_id):
@@ -319,6 +399,11 @@ def start_lobby_game(lobby_id):
     if len(participants) < 1:
         return jsonify({'error': 'Need at least one participant to start'}), 400
     
+    # Get team phrases for competitive mode
+    data = request.json or {}
+    red_phrase = data.get('red_team_phrase', '').strip()
+    blue_phrase = data.get('blue_team_phrase', '').strip()
+    
     # For Competitive mode, select team captains
     if lobby.game_mode == 'competitive':
         if len(participants) < 2:
@@ -338,6 +423,13 @@ def start_lobby_game(lobby_id):
         
         lobby.team_captains = json.dumps([c.player_name for c in captains])
         lobby.active_team = 'red'  # Start with red team
+        
+        # Store team phrases
+        lobby.red_team_phrase = red_phrase if red_phrase else None
+        lobby.blue_team_phrase = blue_phrase if blue_phrase else None
+        
+        # Randomly choose which team's phrase to use for round 5 (3 photos vs 2 photos)
+        lobby.round5_team = random.choice(['red', 'blue'])
     
     # Start the game
     from datetime import datetime

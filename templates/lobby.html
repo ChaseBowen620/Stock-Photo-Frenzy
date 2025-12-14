@@ -42,6 +42,23 @@
                         <div class="loading-text">Loading participants...</div>
                     </div>
                     
+                    {% if lobby.game_mode == 'competitive' %}
+                    <div id="phrase-input-section" class="phrase-input-section" style="display: none;">
+                        <h4>Team Phrases</h4>
+                        <div class="team-phrase-inputs">
+                            <div class="team-phrase red-team">
+                                <label>Red Team Phrase (for Blue Team):</label>
+                                <input type="text" id="red-team-phrase" placeholder="Enter phrase..." maxlength="50">
+                            </div>
+                            <div class="team-phrase blue-team">
+                                <label>Blue Team Phrase (for Red Team):</label>
+                                <input type="text" id="blue-team-phrase" placeholder="Enter phrase..." maxlength="50">
+                            </div>
+                        </div>
+                        <p class="phrase-hint">Each team enters a phrase that will be used to find photos for the other team</p>
+                    </div>
+                    {% endif %}
+                    
                     <div class="start-game-section">
                         <button id="start-game-btn" onclick="startGame()" class="btn-primary btn-start" disabled>
                             Start Game
@@ -117,11 +134,19 @@ function startGame() {
         return;
     }
     
+    // Get team phrases for competitive mode
+    const redPhrase = document.getElementById('red-team-phrase')?.value.trim() || '';
+    const bluePhrase = document.getElementById('blue-team-phrase')?.value.trim() || '';
+    
     fetch(`/api/lobby/${lobbyId}/start`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+            red_team_phrase: redPhrase,
+            blue_team_phrase: bluePhrase
+        })
     })
     .then(response => response.json())
     .then(data => {

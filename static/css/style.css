@@ -986,6 +986,76 @@ footer a:hover {
     opacity: 0.9;
 }
 
+/* Phrase input styles */
+.phrase-input-section {
+    margin: 20px 0;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.phrase-input-section label {
+    display: block;
+    color: white;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.phrase-input-section input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: white;
+}
+
+.phrase-hint {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9rem;
+    margin-top: 8px;
+    font-style: italic;
+}
+
+.team-phrase-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.team-phrase {
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.team-phrase.red-team label {
+    color: #e74c3c;
+}
+
+.team-phrase.blue-team label {
+    color: #3498db;
+}
+
+.phrase-display {
+    margin-top: 10px;
+    padding: 8px 15px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    color: white;
+    font-size: 0.9rem;
+}
+
+.phrase-display span {
+    font-weight: 600;
+    color: #f39c12;
+}
+
+.single-player-section {
+    margin-bottom: 30px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .lobby-section {
@@ -1010,6 +1080,10 @@ footer a:hover {
     
     .btn-difficulty {
         width: 100%;
+    }
+    
+    .team-phrase-inputs {
+        grid-template-columns: 1fr;
     }
 }
 
