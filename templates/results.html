@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Stock Photo Frenzy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header>
+        <h1>Game Complete!</h1>
+        <p>You played {{ total_rounds }} rounds</p>
+    </header>
+    
+    <main>
+        <div class="results-container">
+            {% if is_multiplayer %}
+            {% if game_mode == 'cooperative' %}
+            <div class="score-section">
+                <h2>Team Final Score</h2>
+                <div class="final-score-display">
+                    <span class="score-value">{{ shared_score }}</span>
+                    <span class="score-label">points</span>
+                </div>
+                <p class="cooperative-message">Great teamwork everyone! 🎉</p>
+            </div>
+            {% else %}
+            <div class="leaderboard-section">
+                <h2>Final Leaderboard</h2>
+                <div class="leaderboard-items">
+                    {% for participant in leaderboard %}
+                    <div class="leaderboard-item {% if loop.index == 1 %}winner{% endif %}">
+                        <span class="rank">#{{ loop.index }}</span>
+                        <span class="name">
+                            {{ participant.player_name }}
+                            {% if participant.player_color %}
+                            <span style="color: {{ participant.player_color }}; font-weight: bold;">●</span>
+                            {% endif %}
+                            {% if participant.team %}
+                            <span class="team-badge team-{{ participant.team }}">{{ participant.team }}</span>
+                            {% endif %}
+                        </span>
+                        <span class="score">{{ participant.score }} pts</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="score-section">
+                <h2>Your Final Score</h2>
+                <div class="final-score-display">
+                    <span class="score-value">{{ final_score }}</span>
+                    <span class="score-label">points</span>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="results-actions">
+                <a href="{{ url_for('index') }}" class="btn-primary">Play Again</a>
+                {% if is_multiplayer %}
+                <a href="{{ url_for('index') }}" class="btn-primary">New Game</a>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+

@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+
+{% block title %}Game - Stock Photo Frenzy (Host){% endblock %}
+
+{% block content %}
+<div class="container">
+    <header>
+        <h1>Stock Photo Frenzy - Host</h1>
+        <p>Round <span id="round-number">1</span> of <span id="max-rounds">5</span></p>
+        <div id="mode-indicator" class="mode-indicator"></div>
+        <div id="team-indicator" class="team-indicator" style="display: none;"></div>
+    </header>
+    
+    <main>
+        <div class="game-stats">
+            <div class="stat-banner round-banner">
+                <span class="stat-label">Round:</span>
+                <span id="round" class="stat-value">1/5</span>
+            </div>
+            <div id="shared-score-banner" class="stat-banner score-banner" style="display: none;">
+                <span class="stat-label">Shared Score:</span>
+                <span id="shared-score" class="stat-value">0</span>
+            </div>
+        </div>
+        
+        <div class="image-container">
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Loading your challenge image...</p>
+            </div>
+            
+            <div id="imageDisplay" class="image-display" style="display: none;">
+                <img id="randomImage" src="" alt="Random stock photo">
+                <div class="image-info">
+                    <h3 id="imageTitle">_ _ _ _ _ _ _ _ _ _ _</h3>
+                    <div class="image-meta">
+                        <span id="imageId">ID: </span>
+                        <span id="imageContributor">Contributor: </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="leaderboard" class="leaderboard-container" style="display: none;">
+            <h3>Leaderboard</h3>
+            <div id="leaderboard-list"></div>
+        </div>
+        
+        <div id="round-scoreboard" class="round-scoreboard" style="display: none;">
+            <h3>Round Scoreboard</h3>
+            <div id="round-scores-list"></div>
+        </div>
+        
+        <div class="host-controls">
+            <button id="next-round-btn" onclick="nextRound()" class="btn-primary" style="display: none;">
+                Next Round
+            </button>
+        </div>
+    </main>
+</div>
+
+<script>
+const lobbyId = '{{ lobby_id }}';
+let currentRound = 0;
+let maxRounds = 5;
+let currentImage = null;
+let originalTitle = '';
+let titleWords = [];
+let easyModeHiddenWords = [];
+let revealedWords = [];
+let wordOwners = {};
+let gameMode = 'free-for-all';
+let difficulty = 'hard';
+let activeTeam = null;
+let pollInterval;
+
+async function checkGameStatus() {
+    const response = await fetch(`/api/lobby/${lobbyId}/status`);
+    const data = await response.json();
+    
+    if (data.lobby.status === 'active') {
+        gameMode = data.lobby.game_mode;
+        difficulty = data.lobby.difficulty;
+        maxRounds = 5;  // All modes use 5 rounds
+        document.getElementById('max-rounds').textContent = maxRounds;
+        
+        // Update mode indicator
+        const modeNames = {
+            'free-for-all': 'Free-for-All',
+            'competitive': 'Competitive',
+            'cooperative': 'Cooperative'
+        };
+        document.getElementById('mode-indicator').textContent = modeNames[gameMode] + ' Mode';
+        
+        // Show shared score for cooperative
+        if (gameMode === 'cooperative') {
+            document.getElementById('shared-score-banner').style.display = 'flex';
+        }
+        
+        if (data.lobby.current_image_data) {
+            setupGame(data.lobby.current_image_data);
+        } else {
+            startRound();
+        }
+    } else {
+        setTimeout(checkGameStatus, 1000);
+    }
+}
+
+async function startRound() {
+    if (currentRound >= maxRounds) {
+        window.location.href = `/results?lobby=${lobbyId}`;
+        return;
+    }
+    
+    currentRound++;
+    document.getElementById('round-number').textContent = currentRound;
+    document.getElementById('round').textContent = `${currentRound}/${maxRounds}`;
+    document.getElementById('next-round-btn').style.display = 'none';
+    document.getElementById('leaderboard').style.display = 'none';
+    document.getElementById('round-scoreboard').style.display = 'none';
+    
+    // Update team indicator for competitive
+    if (gameMode === 'competitive') {
+        const response = await fetch(`/api/lobby/${lobbyId}/status`);
+        const data = await response.json();
+        activeTeam = data.lobby.active_team;
+        const teamIndicator = document.getElementById('team-indicator');
+        teamIndicator.style.display = 'block';
+        
+        // Round 5 (index 4, 0-indexed) is free-for-all
+        // Round 1 (index 0): red, Round 2 (index 1): blue, Round 3 (index 2): red, Round 4 (index 3): blue, Round 5 (index 4): both
+        if (currentRound === 5) { // Display shows 1-indexed, but currentRound is 1-indexed in display
+            teamIndicator.textContent = 'FINAL ROUND - Both Teams!';
+            teamIndicator.className = 'team-indicator team-final';
+        } else {
+            teamIndicator.textContent = `${activeTeam.toUpperCase()} Team's Turn`;
+            teamIndicator.className = `team-indicator team-${activeTeam}`;
+        }
+    }
+    
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('imageDisplay').style.display = 'none';
+    
+    try {
+        // Get difficulty from lobby
+        const lobbyResponse = await fetch(`/api/lobby/${lobbyId}/status`);
+        const lobbyData = await lobbyResponse.json();
+        difficulty = lobbyData.lobby.difficulty || 'hard';
+        
+        const response = await fetch(`/api/get-image?difficulty=${difficulty}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        setupGame(data.image);
+        
+        // Store image in lobby
+        await fetch(`/api/lobby/${lobbyId}/next-round`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image_data: data.image })
+        });
+    } catch (error) {
+        console.error('Error loading image:', error);
+        alert('Failed to load image. Please try again.');
+    } finally {
+        document.getElementById('loadingSpinner').style.display = 'none';
+    }
+}
+
+function setupGame(image) {
+    currentImage = image;
+    originalTitle = image.title;
+    titleWords = image.title_words || [];
+    easyModeHiddenWords = image.easy_mode_hidden_words || [];
+    
+    document.getElementById('randomImage').src = image.url;
+    document.getElementById('imageId').textContent = `ID: ${image.id}`;
+    document.getElementById('imageContributor').textContent = `Contributor: ${image.contributor}`;
+    
+    displayHiddenTitle();
+    document.getElementById('imageDisplay').style.display = 'block';
+    
+    startPolling();
+}
+
+function displayHiddenTitle() {
+    const allWords = originalTitle.toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(word => word.length > 0);
+    
+    let displayTitle = originalTitle;
+    
+    allWords.forEach((word) => {
+        if (titleWords.includes(word)) {
+            if (revealedWords.includes(word)) {
+                // Word is revealed - check if we need to color it (Free-for-All mode or Competitive round 5)
+                if ((gameMode === 'free-for-all' || (gameMode === 'competitive' && currentRound === 5)) && wordOwners[word]) {
+                    // We'll get participant info from polling, but for now use a placeholder
+                    // The actual coloring will be done in the polling function
+                    const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
+                    displayTitle = displayTitle.replace(wordRegex, word);
+                }
+            } else {
+                // Word is hidden - check if easy mode
+                if (difficulty === 'easy' && !easyModeHiddenWords.includes(word)) {
+                    // Show word in easy mode
+                    return;
+                }
+                // Hide word
+                const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
+                displayTitle = displayTitle.replace(wordRegex, '_'.repeat(word.length));
+            }
+        }
+    });
+    
+    // Apply color highlighting if needed
+    if ((gameMode === 'free-for-all' || (gameMode === 'competitive' && currentRound === 5)) && Object.keys(wordOwners).length > 0) {
+        // Get participant colors from current state
+        fetch(`/api/lobby/${lobbyId}/status`).then(r => r.json()).then(data => {
+            let highlightedTitle = displayTitle;
+            Object.keys(wordOwners).forEach(word => {
+                if (revealedWords.includes(word)) {
+                    const owner = data.participants.find(p => p.player_name === wordOwners[word]);
+                    if (owner) {
+                        let color = owner.player_color;
+                        if (!color && gameMode === 'competitive') {
+                            color = owner.team === 'red' ? '#e74c3c' : '#3498db';
+                        }
+                        if (color) {
+                            const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
+                            highlightedTitle = highlightedTitle.replace(wordRegex, 
+                                `<span style="background-color: ${color}; color: white; padding: 2px 4px; border-radius: 3px;">${word}</span>`);
+                        }
+                    }
+                }
+            });
+            document.getElementById('imageTitle').innerHTML = highlightedTitle;
+        });
+    } else {
+        document.getElementById('imageTitle').innerHTML = displayTitle;
+    }
+}
+
+function startPolling() {
+    pollInterval = setInterval(async () => {
+        const response = await fetch(`/api/lobby/${lobbyId}/status`);
+        const data = await response.json();
+        
+        if (data.lobby.current_image_data) {
+            const imageData = data.lobby.current_image_data;
+            if (imageData.title_words) {
+                titleWords = imageData.title_words;
+                originalTitle = imageData.title;
+                easyModeHiddenWords = imageData.easy_mode_hidden_words || [];
+            }
+        }
+        
+        revealedWords = data.lobby.revealed_words || [];
+        wordOwners = data.lobby.word_owners || {};
+        
+        displayHiddenTitle();
+        
+        // Update scores
+        if (gameMode === 'cooperative') {
+            document.getElementById('shared-score').textContent = data.lobby.shared_score || 0;
+        } else {
+            updateLeaderboard(data.participants);
+        }
+        
+        // Check if all words revealed - show round scoreboard for Free-for-All
+        if (gameMode === 'free-for-all' && revealedWords.length === titleWords.length) {
+            showRoundScoreboard(data.participants);
+            document.getElementById('next-round-btn').style.display = 'block';
+        } else if (gameMode !== 'free-for-all') {
+            // For other modes, show next round button after some time or when all words revealed
+            if (revealedWords.length === titleWords.length) {
+                document.getElementById('next-round-btn').style.display = 'block';
+            }
+        }
+        
+        // Update active team for competitive
+        if (gameMode === 'competitive') {
+            const newActiveTeam = data.lobby.active_team;
+            const currentRoundNum = data.lobby.current_round || 0;
+            const isRound5 = currentRoundNum === 4; // 0-indexed, so round 5 is index 4
+            
+            if (newActiveTeam !== activeTeam || isRound5) {
+                activeTeam = newActiveTeam;
+                const teamIndicator = document.getElementById('team-indicator');
+                
+                // Round 5 is free-for-all
+                if (isRound5) {
+                    teamIndicator.textContent = 'FINAL ROUND - Both Teams!';
+                    teamIndicator.className = 'team-indicator team-final';
+                } else {
+                    teamIndicator.textContent = `${activeTeam.toUpperCase()} Team's Turn`;
+                    teamIndicator.className = `team-indicator team-${activeTeam}`;
+                }
+            }
+        }
+    }, 1000);
+}
+
+function updateLeaderboard(participants) {
+    const sorted = [...participants].sort((a, b) => b.score - a.score);
+    const list = document.getElementById('leaderboard-list');
+    
+    let html = '<div class="leaderboard-items">';
+    sorted.forEach((p, index) => {
+        const colorStyle = gameMode === 'free-for-all' && p.player_color 
+            ? `style="border-left: 4px solid ${p.player_color};"` 
+            : '';
+        const teamBadge = gameMode === 'competitive' && p.team
+            ? `<span class="team-badge team-${p.team}">${p.team}</span>`
+            : '';
+        html += `
+            <div class="leaderboard-item" ${colorStyle}>
+                <span class="rank">${index + 1}</span>
+                <span class="name">${p.player_name} ${teamBadge}</span>
+                <span class="score">${p.score} pts</span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    list.innerHTML = html;
+    document.getElementById('leaderboard').style.display = 'block';
+}
+
+function showRoundScoreboard(participants) {
+    // Calculate round scores (words found this round)
+    const roundScores = participants.map(p => {
+        const roundWords = (p.guessed_words || []).filter(w => 
+            revealedWords.includes(w)
+        );
+        return {
+            name: p.player_name,
+            score: roundWords.length * 10,
+            color: p.player_color
+        };
+    }).sort((a, b) => b.score - a.score);
+    
+    const list = document.getElementById('round-scores-list');
+    let html = '<div class="round-scores-items">';
+    roundScores.forEach((p, index) => {
+        const colorStyle = p.color ? `style="border-left: 4px solid ${p.color};"` : '';
+        html += `
+            <div class="round-score-item" ${colorStyle}>
+                <span class="rank">${index + 1}</span>
+                <span class="name">${p.name}</span>
+                <span class="score">${p.score} pts</span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    list.innerHTML = html;
+    document.getElementById('round-scoreboard').style.display = 'block';
+}
+
+async function nextRound() {
+    const response = await fetch(`/api/lobby/${lobbyId}/next-round`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+    
+    const data = await response.json();
+    
+    if (data.game_finished) {
+        window.location.href = `/results?lobby=${lobbyId}`;
+    } else {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+        }
+        startRound();
+    }
+}
+
+checkGameStatus();
+</script>
+{% endblock %}

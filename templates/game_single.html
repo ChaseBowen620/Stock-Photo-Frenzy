@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Game - Stock Photo Frenzy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header>
+        <h1>Stock Photo Frenzy</h1>
+        <p>Round <span id="round-number">1</span> of 5</p>
+    </header>
+    
+    <main>
+        <div class="game-stats">
+            <div class="stat-banner score-banner">
+                <span class="stat-label">Score:</span>
+                <span id="score" class="stat-value">0</span>
+            </div>
+            <div class="stat-banner round-banner">
+                <span class="stat-label">Round:</span>
+                <span id="round" class="stat-value">1/5</span>
+            </div>
+        </div>
+        
+        <div class="image-container">
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Loading your challenge image...</p>
+            </div>
+            
+            <div id="imageDisplay" class="image-display" style="display: none;">
+                <img id="randomImage" src="" alt="Random stock photo">
+                <div class="image-info">
+                    <h3 id="imageTitle">_ _ _ _ _ _ _ _ _ _ _</h3>
+                    <div class="image-meta">
+                        <span id="imageId">ID: </span>
+                        <span id="imageContributor">Contributor: </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="guessingInterface" class="guessing-interface" style="display: none;">
+            <div class="guess-input-container">
+                <input type="text" id="guessInput" placeholder="Enter a word to guess..." maxlength="20">
+                <button id="guessBtn" class="btn-guess">Guess</button>
+            </div>
+            <div class="guess-feedback">
+                <p id="guessFeedback" class="feedback-text"></p>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+let currentRound = 0;
+let totalScore = 0;
+let currentImage = null;
+let originalTitle = '';
+let titleWords = [];
+let revealedWords = new Set();
+let guessedWords = new Set();
+
+async function startRound() {
+    if (currentRound >= 5) {
+        // Game finished
+        sessionStorage.setItem('final_score', totalScore);
+        window.location.href = '/results';
+        return;
+    }
+    
+    currentRound++;
+    document.getElementById('round-number').textContent = currentRound;
+    document.getElementById('round').textContent = `${currentRound}/5`;
+    
+    // Reset round state
+    revealedWords.clear();
+    guessedWords.clear();
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('imageDisplay').style.display = 'none';
+    document.getElementById('guessingInterface').style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/get-image');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        setupGame(data.image);
+    } catch (error) {
+        console.error('Error loading image:', error);
+        alert('Failed to load image. Please try again.');
+    } finally {
+        document.getElementById('loadingSpinner').style.display = 'none';
+    }
+}
+
+function setupGame(image) {
+    currentImage = image;
+    originalTitle = image.title;
+    titleWords = image.title_words;
+    
+    // Display image
+    document.getElementById('randomImage').src = image.url;
+    document.getElementById('imageId').textContent = `ID: ${image.id}`;
+    document.getElementById('imageContributor').textContent = `Contributor: ${image.contributor}`;
+    
+    displayHiddenTitle();
+    
+    document.getElementById('imageDisplay').style.display = 'block';
+    document.getElementById('guessingInterface').style.display = 'block';
+    document.getElementById('guessInput').focus();
+}
+
+function displayHiddenTitle() {
+    const allWords = originalTitle.toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(word => word.length > 0);
+    
+    const displayWords = allWords.map(word => {
+        if (titleWords.includes(word)) {
+            if (revealedWords.has(word)) {
+                return word;
+            } else {
+                return '_'.repeat(word.length);
+            }
+        } else {
+            return word;
+        }
+    });
+    
+    let displayTitle = originalTitle;
+    allWords.forEach((word, index) => {
+        const displayWord = displayWords[index];
+        const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
+        displayTitle = displayTitle.replace(wordRegex, displayWord);
+    });
+    
+    document.getElementById('imageTitle').textContent = displayTitle;
+}
+
+function makeGuess() {
+    const guess = document.getElementById('guessInput').value.trim().toLowerCase();
+    
+    if (!guess || guess.length < 3) {
+        showFeedback('Word must be at least 3 characters long!', 'incorrect');
+        return;
+    }
+    
+    if (guessedWords.has(guess)) {
+        showFeedback('You already guessed this word!', 'already-guessed');
+        document.getElementById('guessInput').value = '';
+        return;
+    }
+    
+    guessedWords.add(guess);
+    
+    const foundWords = titleWords.filter(word => word === guess);
+    
+    if (foundWords.length > 0) {
+        foundWords.forEach(word => {
+            revealedWords.add(word);
+        });
+        
+        const points = foundWords.length * 10;
+        totalScore += points;
+        updateScore();
+        
+        showFeedback(`Great! Found "${guess}" (${foundWords.length} time${foundWords.length > 1 ? 's' : ''})! +${points} points`, 'correct');
+        
+        displayHiddenTitle();
+        
+        // Check if all words revealed
+        if (revealedWords.size === titleWords.length) {
+            totalScore += 100; // Completion bonus
+            updateScore();
+            showFeedback('Perfect! All words found! +100 completion bonus!', 'correct');
+            
+            // Move to next round after delay
+            setTimeout(() => {
+                startRound();
+            }, 3000);
+        }
+    } else {
+        showFeedback(`"${guess}" is not in the title. Try again!`, 'incorrect');
+    }
+    
+    document.getElementById('guessInput').value = '';
+}
+
+function updateScore() {
+    document.getElementById('score').textContent = totalScore;
+}
+
+function showFeedback(message, type) {
+    const feedback = document.getElementById('guessFeedback');
+    feedback.textContent = message;
+    feedback.className = `feedback-text ${type}`;
+}
+
+document.getElementById('guessBtn').addEventListener('click', makeGuess);
+document.getElementById('guessInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        makeGuess();
+    }
+});
+
+// Start first round
+startRound();
+</script>
+{% endblock %}
+

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Join Lobby - Stock Photo Frenzy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header>
+        <h1>Join Game</h1>
+        <p>Enter your name to join the game!</p>
+    </header>
+    
+    <main>
+        <div class="join-container">
+            <div class="join-form">
+                <h3>Lobby: {{ lobby.id }}</h3>
+                <div class="form-group">
+                    <label for="player-name">Your Name:</label>
+                    <input type="text" id="player-name" placeholder="Enter your name..." maxlength="20" required>
+                </div>
+                <button onclick="joinGame()" class="btn-primary btn-join">Join Game</button>
+                <div id="join-error" class="error-message" style="display: none;"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+const lobbyId = '{{ lobby.id }}';
+
+function joinGame() {
+    const playerName = document.getElementById('player-name').value.trim();
+    const errorDiv = document.getElementById('join-error');
+    
+    if (!playerName) {
+        errorDiv.textContent = 'Please enter your name';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    fetch(`/api/lobby/${lobbyId}/join`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            player_name: playerName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            errorDiv.textContent = data.error;
+            errorDiv.style.display = 'block';
+        } else {
+            // Store player info
+            localStorage.setItem(`player_name_${lobbyId}`, playerName);
+            localStorage.setItem(`player_id_${lobbyId}`, data.player_id);
+            
+            // Wait for game to start
+            window.location.href = `/game?lobby=${lobbyId}&mobile=true`;
+        }
+    })
+    .catch(error => {
+        console.error('Error joining game:', error);
+        errorDiv.textContent = 'Failed to join game. Please try again.';
+        errorDiv.style.display = 'block';
+    });
+}
+
+document.getElementById('player-name').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        joinGame();
+    }
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Error - Stock Photo Frenzy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header>
+        <h1>Error</h1>
+    </header>
+    
+    <main>
+        <div class="error-container">
+            <div class="error-message">
+                <h3>{{ error }}</h3>
+                <a href="{{ url_for('index') }}" class="btn-primary">Go Home</a>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+

@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}Game - Stock Photo Frenzy{% endblock %}
+
+{% block content %}
+<div class="container mobile-container">
+    <header>
+        <h2 id="player-name">Player</h2>
+        <p>Round <span id="round-number">1</span> of <span id="max-rounds">5</span></p>
+        <div id="mode-info" class="mode-info"></div>
+        <div id="team-info" class="team-info" style="display: none;"></div>
+    </header>
+    
+    <main>
+        <div class="mobile-stats">
+            <div class="stat-banner score-banner">
+                <span class="stat-label" id="score-label">Score:</span>
+                <span id="score" class="stat-value">0</span>
+            </div>
+            <div id="shared-score-banner" class="stat-banner score-banner" style="display: none;">
+                <span class="stat-label">Shared Score:</span>
+                <span id="shared-score" class="stat-value">0</span>
+            </div>
+        </div>
+        
+        <div id="waiting-screen" class="waiting-screen">
+            <div class="spinner"></div>
+            <p>Waiting for game to start...</p>
+        </div>
+        
+        <div id="not-your-turn" class="not-your-turn" style="display: none;">
+            <h3>Not Your Turn</h3>
+            <p id="turn-message"></p>
+        </div>
+        
+        <div id="game-screen" class="game-screen" style="display: none;">
+            <div class="image-container-mobile">
+                <img id="gameImage" src="" alt="Stock photo">
+            </div>
+            
+            <div class="title-display-mobile">
+                <h3 id="imageTitle">_ _ _ _ _ _ _ _ _ _ _</h3>
+            </div>
+            
+            <div class="guess-input-mobile">
+                <input type="text" id="wordInput" placeholder="Enter a word..." maxlength="20">
+                <button id="submitBtn" onclick="submitWord()" class="btn-submit">Submit</button>
+            </div>
+            
+            <div id="feedback" class="feedback-mobile"></div>
+        </div>
+    </main>
+</div>
+
+<script>
+const lobbyId = '{{ lobby_id }}';
+let playerName = localStorage.getItem(`player_name_${lobbyId}`) || 'Player';
+let currentScore = 0;
+let currentRound = 0;
+let maxRounds = 5;
+let gameMode = 'free-for-all';
+let playerColor = null;
+let playerTeam = null;
+let isCaptain = false;
+let activeTeam = null;
+let difficulty = 'hard';
+let easyModeHiddenWords = [];
+
+document.getElementById('player-name').textContent = playerName;
+
+async function checkGameStatus() {
+    const response = await fetch(`/api/lobby/${lobbyId}/status`);
+    const data = await response.json();
+    
+    if (data.lobby.status === 'active') {
+        gameMode = data.lobby.game_mode;
+        difficulty = data.lobby.difficulty;
+        maxRounds = 5;  // All modes use 5 rounds
+        document.getElementById('max-rounds').textContent = maxRounds;
+        
+        // Find this player
+        const participant = data.participants.find(p => p.player_name === playerName);
+        if (participant) {
+            playerColor = participant.player_color;
+            playerTeam = participant.team;
+            isCaptain = participant.is_captain;
+            currentScore = participant.score;
+        }
+        
+        // Update UI based on mode
+        updateModeUI(data.lobby);
+        
+        document.getElementById('waiting-screen').style.display = 'none';
+        
+        // Check if player can participate
+        const currentRoundNum = data.lobby.current_round || 0;
+        const isRound5 = currentRoundNum === 4; // 0-indexed, so round 5 is index 4
+        
+        if (gameMode === 'competitive' && !isRound5) {
+            // Rounds 1-4: Only active team's captain can play
+            if (!isCaptain || playerTeam !== data.lobby.active_team) {
+                document.getElementById('not-your-turn').style.display = 'block';
+                document.getElementById('game-screen').style.display = 'none';
+                activeTeam = data.lobby.active_team;
+                document.getElementById('turn-message').textContent = 
+                    `It's the ${activeTeam} team's turn. ${isCaptain ? 'You are a captain!' : 'Wait for your team\'s turn.'}`;
+            } else {
+                document.getElementById('not-your-turn').style.display = 'none';
+                document.getElementById('game-screen').style.display = 'block';
+            }
+        } else if (gameMode === 'competitive' && isRound5) {
+            // Round 5: Both teams can play (but still only captains)
+            if (!isCaptain) {
+                document.getElementById('not-your-turn').style.display = 'block';
+                document.getElementById('game-screen').style.display = 'none';
+                document.getElementById('turn-message').textContent = 
+                    'Final Round! Both teams can play, but only captains can submit words.';
+            } else {
+                document.getElementById('not-your-turn').style.display = 'none';
+                document.getElementById('game-screen').style.display = 'block';
+            }
+        } else {
+            document.getElementById('not-your-turn').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'block';
+        }
+        
+        if (data.lobby.current_image_data) {
+            setupGame(data.lobby.current_image_data);
+        }
+        
+        // Start polling for updates
+        startPolling();
+    } else {
+        setTimeout(checkGameStatus, 2000);
+    }
+}
+
+function updateModeUI(lobby) {
+    const modeInfo = document.getElementById('mode-info');
+    const scoreLabel = document.getElementById('score-label');
+    
+    if (gameMode === 'cooperative') {
+        modeInfo.textContent = 'Cooperative Mode - Working Together!';
+        document.getElementById('shared-score-banner').style.display = 'flex';
+        document.getElementById('score').parentElement.style.display = 'none';
+        document.getElementById('shared-score').textContent = lobby.shared_score || 0;
+    } else     if (gameMode === 'competitive') {
+        const currentRoundNum = lobby.current_round || 0;
+        const isRound5 = currentRoundNum === 4;
+        
+        if (isRound5) {
+            modeInfo.textContent = 'Final Round - Both Teams!';
+        } else {
+            modeInfo.textContent = 'Competitive Mode';
+        }
+        if (isCaptain) {
+            modeInfo.textContent += ' - You are a Captain!';
+        }
+        document.getElementById('team-info').style.display = 'block';
+        document.getElementById('team-info').textContent = `${playerTeam.toUpperCase()} Team`;
+        document.getElementById('team-info').className = `team-info team-${playerTeam}`;
+    } else {
+        modeInfo.textContent = 'Free-for-All Mode';
+        if (playerColor) {
+            modeInfo.innerHTML += ` <span style="color: ${playerColor}; font-weight: bold;">●</span>`;
+        }
+    }
+}
+
+function setupGame(imageData) {
+    document.getElementById('gameImage').src = imageData.url;
+    easyModeHiddenWords = imageData.easy_mode_hidden_words || [];
+    updateTitleDisplay(imageData.title, imageData.title_words, [], {});
+}
+
+function updateTitleDisplay(title, titleWords, revealedWords, wordOwners) {
+    const allWords = title.toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(word => word.length > 0);
+    
+    let displayTitle = title;
+    
+    allWords.forEach((word) => {
+        if (titleWords.includes(word)) {
+            if (revealedWords.includes(word)) {
+                // Word is revealed
+                const currentRoundNum = currentRound || 0;
+                if ((gameMode === 'free-for-all' || (gameMode === 'competitive' && currentRoundNum === 4)) && wordOwners[word] === playerName) {
+                    // Highlight words this player found
+                    let color = playerColor;
+                    if (!color && gameMode === 'competitive') {
+                        // Fallback to team color if no player color
+                        color = playerTeam === 'red' ? '#e74c3c' : '#3498db';
+                    }
+                    if (color) {
+                        const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
+                        displayTitle = displayTitle.replace(wordRegex, 
+                            `<span style="background-color: ${color}; color: white; padding: 2px 4px; border-radius: 3px;">${word}</span>`);
+                    }
+                }
+            } else {
+                // Word is hidden - check if easy mode
+                if (difficulty === 'easy' && !easyModeHiddenWords.includes(word)) {
+                    // Show word in easy mode
+                    return;
+                }
+                // Hide word
+                const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
+                displayTitle = displayTitle.replace(wordRegex, '_'.repeat(word.length));
+            }
+        }
+    });
+    
+    document.getElementById('imageTitle').innerHTML = displayTitle;
+}
+
+async function submitWord() {
+    const word = document.getElementById('wordInput').value.trim().toLowerCase();
+    
+    if (!word || word.length < 3) {
+        showFeedback('Word must be at least 3 characters!', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/lobby/${lobbyId}/submit-word`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player_name: playerName,
+                word: word
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            showFeedback(data.error, 'error');
+        } else {
+            if (data.is_correct) {
+                showFeedback(`Correct! +${data.points} points`, 'success');
+                if (gameMode !== 'cooperative') {
+                    currentScore = data.score;
+                    document.getElementById('score').textContent = currentScore;
+                }
+            } else {
+                showFeedback('Not in the title. Try again!', 'error');
+            }
+            
+            document.getElementById('wordInput').value = '';
+        }
+    } catch (error) {
+        console.error('Error submitting word:', error);
+        showFeedback('Failed to submit. Please try again.', 'error');
+    }
+}
+
+function showFeedback(message, type) {
+    const feedback = document.getElementById('feedback');
+    feedback.textContent = message;
+    feedback.className = `feedback-mobile ${type}`;
+    feedback.style.display = 'block';
+    
+    setTimeout(() => {
+        feedback.style.display = 'none';
+    }, 3000);
+}
+
+function startPolling() {
+    setInterval(async () => {
+        const response = await fetch(`/api/lobby/${lobbyId}/status`);
+        const data = await response.json();
+        
+        if (data.lobby.current_image_data) {
+            const imageData = data.lobby.current_image_data;
+            updateTitleDisplay(
+                imageData.title, 
+                imageData.title_words, 
+                data.lobby.revealed_words || [],
+                data.lobby.word_owners || {}
+            );
+        }
+        
+        // Update scores
+        if (gameMode === 'cooperative') {
+            document.getElementById('shared-score').textContent = data.lobby.shared_score || 0;
+        } else {
+            const participant = data.participants.find(p => p.player_name === playerName);
+            if (participant) {
+                currentScore = participant.score;
+                document.getElementById('score').textContent = currentScore;
+            }
+        }
+        
+        // Check if round changed
+        if (data.lobby.current_round !== currentRound) {
+            currentRound = data.lobby.current_round;
+            document.getElementById('round-number').textContent = currentRound + 1;
+            
+            if (currentRound >= maxRounds) {
+                window.location.href = `/results?lobby=${lobbyId}`;
+            }
+        }
+        
+        // Update active team for competitive
+        if (gameMode === 'competitive') {
+            const currentRoundNum = data.lobby.current_round || 0;
+            const isRound5 = currentRoundNum === 4;
+            
+            if (isRound5) {
+                // Round 5: Both teams can play
+                if (activeTeam !== null) {
+                    activeTeam = null;
+                    checkGameStatus(); // Re-check to update UI
+                }
+            } else if (data.lobby.active_team !== activeTeam) {
+                activeTeam = data.lobby.active_team;
+                checkGameStatus(); // Re-check to update UI
+            }
+        }
+    }, 1000);
+}
+
+document.getElementById('wordInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        submitWord();
+    }
+});
+
+checkGameStatus();
+</script>
+{% endblock %}

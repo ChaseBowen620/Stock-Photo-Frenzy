@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Photo Frenzy - Home{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header>
+        <h1>Stock Photo Frenzy</h1>
+        <p>Guess words in the image title to reveal it!</p>
+    </header>
+    
+    <main>
+        <div class="welcome-message">
+            <h3>Welcome to Stock Photo Frenzy!</h3>
+            <p>Choose your game mode to get started!</p>
+            <div class="game-mode-buttons">
+                <a href="{{ url_for('game') }}" class="btn-primary btn-single">
+                    <span class="btn-text">Single Player</span>
+                </a>
+            </div>
+            
+            <div class="multiplayer-section">
+                <h4>Multiplayer Modes</h4>
+                <div class="mode-selection">
+                    <div class="mode-option" onclick="selectMode('free-for-all')">
+                        <h5>Free-for-All</h5>
+                        <p>All players compete individually. Each player gets a color!</p>
+                    </div>
+                    <div class="mode-option" onclick="selectMode('competitive')">
+                        <h5>Competitive</h5>
+                        <p>Two teams compete. 6 rounds alternating between teams.</p>
+                    </div>
+                    <div class="mode-option" onclick="selectMode('cooperative')">
+                        <h5>Cooperative</h5>
+                        <p>All players work together for one shared score!</p>
+                    </div>
+                </div>
+                
+                <div class="difficulty-selection" style="display: none;" id="difficulty-selection">
+                    <h5>Select Difficulty:</h5>
+                    <div class="difficulty-buttons">
+                        <button class="btn-difficulty btn-easy" onclick="selectDifficulty('easy')">Easy (3 words hidden)</button>
+                        <button class="btn-difficulty btn-hard" onclick="selectDifficulty('hard')">Hard (All words hidden)</button>
+                    </div>
+                </div>
+                
+                <form id="multiplayer-form" method="POST" action="{{ url_for('lobby') }}" style="display: none;">
+                    <input type="hidden" name="game_mode" id="selected-mode">
+                    <input type="hidden" name="difficulty" id="selected-difficulty">
+                    <button type="submit" class="btn-primary btn-multiplayer">Create Lobby</button>
+                </form>
+            </div>
+            <div class="game-info">
+                <h4>How to Play:</h4>
+                <ul>
+                    <li>Guess words in the stock photo title</li>
+                    <li>Each correct word gives you 10 points</li>
+                    <li>Complete the title for a 100-point bonus!</li>
+                    <li>Play 5 rounds to see your final score</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+    
+    <footer>
+        <p>Powered by <a href="https://www.shutterstock.com" target="_blank">Shutterstock API</a></p>
+    </footer>
+</div>
+
+<script>
+let selectedMode = null;
+let selectedDifficulty = null;
+
+function selectMode(mode) {
+    selectedMode = mode;
+    
+    // Update UI
+    document.querySelectorAll('.mode-option').forEach(opt => opt.classList.remove('selected'));
+    event.currentTarget.classList.add('selected');
+    
+    // Show difficulty selection
+    document.getElementById('difficulty-selection').style.display = 'block';
+    document.getElementById('multiplayer-form').style.display = 'block';
+}
+
+function selectDifficulty(difficulty) {
+    selectedDifficulty = difficulty;
+    
+    // Update UI
+    document.querySelectorAll('.btn-difficulty').forEach(btn => btn.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    
+    // Update form
+    document.getElementById('selected-mode').value = selectedMode;
+    document.getElementById('selected-difficulty').value = selectedDifficulty;
+}
+</script>
+{% endblock %}
+

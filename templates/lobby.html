@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Lobby - Stock Photo Frenzy{% endblock %}
+
+{% block content %}
+<div class="container">
+    <header>
+        <h1>Game Lobby</h1>
+        <p>Share the QR code below for others to join!</p>
+        <div class="lobby-info">
+            <div class="mode-badge mode-{{ lobby.game_mode }}">
+                Mode: {{ lobby.game_mode.replace('-', ' ').title() }}
+            </div>
+            <div class="difficulty-badge difficulty-{{ lobby.difficulty }}">
+                Difficulty: {{ lobby.difficulty.title() }}
+            </div>
+        </div>
+        {% if mode_description %}
+        <p class="mode-description">{{ mode_description }}</p>
+        {% endif %}
+    </header>
+    
+    <main>
+        <div class="lobby-container">
+            <div class="lobby-section">
+                <div class="qr-section">
+                    <h3>Lobby Code</h3>
+                    <div class="lobby-code">{{ lobby.id }}</div>
+                    <div class="qr-code-container">
+                        <img src="{{ qr_code }}" alt="QR Code" class="qr-code">
+                    </div>
+                    <p class="qr-hint">Scan with your phone to join</p>
+                    <div class="join-url-container">
+                        <input type="text" id="join-url" value="{{ join_url }}" readonly>
+                        <button onclick="copyJoinUrl()" class="btn-copy">Copy</button>
+                    </div>
+                </div>
+                
+                <div class="participants-section">
+                    <h3>Players (<span id="participant-count">{{ lobby.participant_count }}</span>)</h3>
+                    <div id="participants-list" class="participants-list">
+                        <div class="loading-text">Loading participants...</div>
+                    </div>
+                    
+                    <div class="start-game-section">
+                        <button id="start-game-btn" onclick="startGame()" class="btn-primary btn-start" disabled>
+                            Start Game
+                        </button>
+                        <p id="start-hint" class="start-hint">Waiting for players to join...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+const lobbyId = '{{ lobby.id }}';
+let pollInterval;
+
+function updateLobbyStatus() {
+    fetch(`/api/lobby/${lobbyId}/status`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error:', data.error);
+                return;
+            }
+            
+            const participants = data.participants || [];
+            const participantCount = participants.length;
+            
+            document.getElementById('participant-count').textContent = participantCount;
+            
+            const participantsList = document.getElementById('participants-list');
+            if (participants.length === 0) {
+                participantsList.innerHTML = '<div class="no-participants">No players joined yet. Share the QR code above!</div>';
+            } else {
+                let html = '<div class="participant-items">';
+                participants.forEach((p, index) => {
+                    html += `
+                        <div class="participant-item">
+                            <strong>${p.player_name || 'Player ' + (index + 1)}</strong>
+                            ${p.score > 0 ? `<span class="score-badge">${p.score} pts</span>` : ''}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                participantsList.innerHTML = html;
+            }
+            
+            const startBtn = document.getElementById('start-game-btn');
+            const startHint = document.getElementById('start-hint');
+            
+            if (data.lobby.status === 'active') {
+                startBtn.disabled = true;
+                startBtn.textContent = 'Game Started!';
+                startHint.textContent = 'Game is in progress...';
+                setTimeout(() => {
+                    window.location.href = `/game?lobby=${lobbyId}`;
+                }, 2000);
+            } else if (participantCount >= 1) {
+                startBtn.disabled = false;
+                startHint.textContent = `Ready to start with ${participantCount} player(s)!`;
+            } else {
+                startBtn.disabled = true;
+                startHint.textContent = 'Waiting for players to join...';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching lobby status:', error);
+        });
+}
+
+function startGame() {
+    if (!confirm('Start the game now? All players will begin.')) {
+        return;
+    }
+    
+    fetch(`/api/lobby/${lobbyId}/start`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            window.location.href = `/game?lobby=${lobbyId}`;
+        }
+    })
+    .catch(error => {
+        console.error('Error starting game:', error);
+        alert('Failed to start game. Please try again.');
+    });
+}
+
+function copyJoinUrl() {
+    const input = document.getElementById('join-url');
+    input.select();
+    document.execCommand('copy');
+    
+    const btn = event.target.closest('button');
+    const originalText = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => {
+        btn.textContent = originalText;
+    }, 2000);
+}
+
+pollInterval = setInterval(updateLobbyStatus, 2000);
+updateLobbyStatus();
+
+window.addEventListener('beforeunload', () => {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+    }
+});
+</script>
+{% endblock %}
+
