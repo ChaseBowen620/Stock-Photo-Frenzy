@@ -14,7 +14,10 @@ import requests
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__, template_folder='../templates', static_folder='../static')
+app = Flask(__name__, 
+            template_folder='../templates', 
+            static_folder='../static',
+            static_url_path='/static')
 app.secret_key = os.getenv('SECRET_KEY', secrets.token_hex(16))
 
 # Database configuration
@@ -670,6 +673,23 @@ def results():
                              is_multiplayer=False, 
                              final_score=final_score,
                              total_rounds=5)
+
+# Set correct MIME types for static files
+@app.after_request
+def set_static_mime_types(response):
+    """Set correct MIME types for static files"""
+    if request.path.startswith('/static/'):
+        if request.path.endswith('.css'):
+            response.headers['Content-Type'] = 'text/css; charset=utf-8'
+        elif request.path.endswith('.js'):
+            response.headers['Content-Type'] = 'application/javascript; charset=utf-8'
+        elif request.path.endswith('.png'):
+            response.headers['Content-Type'] = 'image/png'
+        elif request.path.endswith('.jpg') or request.path.endswith('.jpeg'):
+            response.headers['Content-Type'] = 'image/jpeg'
+        elif request.path.endswith('.svg'):
+            response.headers['Content-Type'] = 'image/svg+xml'
+    return response
 
 # Create database tables
 with app.app_context():
