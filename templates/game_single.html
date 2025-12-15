@@ -77,8 +77,8 @@ async function startRound() {
     if (currentRound >= 5) {
         // Game finished
         stopTimer();
-        sessionStorage.setItem('final_score', totalScore);
-        window.location.href = '/results';
+        // Pass score as URL parameter
+        window.location.href = `/results?score=${totalScore}`;
         return;
     }
     

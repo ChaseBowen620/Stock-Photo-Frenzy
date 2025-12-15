@@ -670,7 +670,15 @@ def results():
                              total_rounds=max_rounds)
     else:
         # Single player results
-        final_score = session.get('final_score', 0)
+        # Get score from URL parameter or session (fallback)
+        final_score = request.args.get('score')
+        if final_score:
+            try:
+                final_score = int(final_score)
+            except (ValueError, TypeError):
+                final_score = session.get('final_score', 0)
+        else:
+            final_score = session.get('final_score', 0)
         return render_template('results.html', 
                              is_multiplayer=False, 
                              final_score=final_score,

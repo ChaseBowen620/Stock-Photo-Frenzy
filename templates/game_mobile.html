@@ -34,14 +34,6 @@
         </div>
         
         <div id="game-screen" class="game-screen" style="display: none;">
-            <div class="image-container-mobile">
-                <img id="gameImage" src="" alt="Stock photo">
-            </div>
-            
-            <div class="title-display-mobile">
-                <h3 id="imageTitle">_ _ _ _ _ _ _ _ _ _ _</h3>
-            </div>
-            
             <div class="guess-input-mobile">
                 <input type="text" id="wordInput" placeholder="Enter a word..." maxlength="20">
                 <button id="submitBtn" onclick="submitWord()" class="btn-submit">Submit</button>
@@ -124,11 +116,7 @@ async function checkGameStatus() {
             document.getElementById('game-screen').style.display = 'block';
         }
         
-        if (data.lobby.current_image_data) {
-            setupGame(data.lobby.current_image_data);
-        }
-        
-        // Start polling for updates
+        // Start polling for updates (no need to setup game image/title on mobile)
         startPolling();
     } else {
         setTimeout(checkGameStatus, 2000);
@@ -167,53 +155,7 @@ function updateModeUI(lobby) {
     }
 }
 
-function setupGame(imageData) {
-    document.getElementById('gameImage').src = imageData.url;
-    easyModeHiddenWords = imageData.easy_mode_hidden_words || [];
-    updateTitleDisplay(imageData.title, imageData.title_words, [], {});
-}
-
-function updateTitleDisplay(title, titleWords, revealedWords, wordOwners) {
-    const allWords = title.toLowerCase()
-        .replace(/[^\w\s]/g, ' ')
-        .split(/\s+/)
-        .filter(word => word.length > 0);
-    
-    let displayTitle = title;
-    
-    allWords.forEach((word) => {
-        if (titleWords.includes(word)) {
-            if (revealedWords.includes(word)) {
-                // Word is revealed
-                const currentRoundNum = currentRound || 0;
-                if ((gameMode === 'free-for-all' || (gameMode === 'competitive' && currentRoundNum === 4)) && wordOwners[word] === playerName) {
-                    // Highlight words this player found
-                    let color = playerColor;
-                    if (!color && gameMode === 'competitive') {
-                        // Fallback to team color if no player color
-                        color = playerTeam === 'red' ? '#e74c3c' : '#3498db';
-                    }
-                    if (color) {
-                        const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
-                        displayTitle = displayTitle.replace(wordRegex, 
-                            `<span style="background-color: ${color}; color: white; padding: 2px 4px; border-radius: 3px;">${word}</span>`);
-                    }
-                }
-            } else {
-                // Word is hidden - check if easy mode
-                if (difficulty === 'easy' && !easyModeHiddenWords.includes(word)) {
-                    // Show word in easy mode
-                    return;
-                }
-                // Hide word
-                const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
-                displayTitle = displayTitle.replace(wordRegex, '_'.repeat(word.length));
-            }
-        }
-    });
-    
-    document.getElementById('imageTitle').innerHTML = displayTitle;
-}
+// Image and title display removed from mobile - players should look at host screen
 
 async function submitWord() {
     const word = document.getElementById('wordInput').value.trim().toLowerCase();
@@ -272,15 +214,7 @@ function startPolling() {
         const response = await fetch(`/api/lobby/${lobbyId}/status`);
         const data = await response.json();
         
-        if (data.lobby.current_image_data) {
-            const imageData = data.lobby.current_image_data;
-            updateTitleDisplay(
-                imageData.title, 
-                imageData.title_words, 
-                data.lobby.revealed_words || [],
-                data.lobby.word_owners || {}
-            );
-        }
+        // Image and title display removed - players should look at host screen
         
         // Update scores
         if (gameMode === 'cooperative') {

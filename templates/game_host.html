@@ -17,6 +17,10 @@
                 <span class="stat-label">Round:</span>
                 <span id="round" class="stat-value">1/5</span>
             </div>
+            <div class="stat-banner timer-banner">
+                <span class="stat-label">Time:</span>
+                <span id="timer" class="stat-value timer-value">1:00</span>
+            </div>
             <div id="shared-score-banner" class="stat-banner score-banner" style="display: none;">
                 <span class="stat-label">Shared Score:</span>
                 <span id="shared-score" class="stat-value">0</span>
@@ -73,6 +77,8 @@ let gameMode = 'free-for-all';
 let difficulty = 'hard';
 let activeTeam = null;
 let pollInterval;
+let timeLeft = 60;
+let timerInterval = null;
 
 async function checkGameStatus() {
     const response = await fetch(`/api/lobby/${lobbyId}/status`);
@@ -99,6 +105,12 @@ async function checkGameStatus() {
         
         if (data.lobby.current_image_data) {
             setupGame(data.lobby.current_image_data);
+            // Start timer when game is set up
+            if (!timerInterval) {
+                timeLeft = 60;
+                updateTimerDisplay();
+                startTimer();
+            }
         } else {
             startRound();
         }
@@ -119,6 +131,11 @@ async function startRound() {
     document.getElementById('next-round-btn').style.display = 'none';
     document.getElementById('leaderboard').style.display = 'none';
     document.getElementById('round-scoreboard').style.display = 'none';
+    
+    // Reset and start timer
+    timeLeft = 60;
+    updateTimerDisplay();
+    startTimer();
     
     // Update team indicator for competitive
     if (gameMode === 'competitive') {
@@ -260,6 +277,13 @@ function setupGame(image) {
     displayHiddenTitle();
     document.getElementById('imageDisplay').style.display = 'block';
     
+    // Start timer when game is set up
+    if (!timerInterval) {
+        timeLeft = 60;
+        updateTimerDisplay();
+        startTimer();
+    }
+    
     startPolling();
 }
 
@@ -348,15 +372,17 @@ function startPolling() {
             updateLeaderboard(data.participants);
         }
         
-        // Check if all words revealed - show round scoreboard for Free-for-All
-        if (gameMode === 'free-for-all' && revealedWords.length === titleWords.length) {
-            showRoundScoreboard(data.participants);
-            document.getElementById('next-round-btn').style.display = 'block';
-        } else if (gameMode !== 'free-for-all') {
-            // For other modes, show next round button after some time or when all words revealed
-            if (revealedWords.length === titleWords.length) {
-                document.getElementById('next-round-btn').style.display = 'block';
+        // Check if all words revealed
+        const wordsToReveal = (easyModeHiddenWords.length > 0) ? easyModeHiddenWords : titleWords;
+        const allWordsRevealed = wordsToReveal.length > 0 && wordsToReveal.every(word => revealedWords.includes(word));
+        
+        if (allWordsRevealed) {
+            stopTimer();
+            // Show round scoreboard for Free-for-All
+            if (gameMode === 'free-for-all') {
+                showRoundScoreboard(data.participants);
             }
+            document.getElementById('next-round-btn').style.display = 'block';
         }
         
         // Update active team for competitive
@@ -437,7 +463,45 @@ function showRoundScoreboard(participants) {
     document.getElementById('round-scoreboard').style.display = 'block';
 }
 
+function startTimer() {
+    stopTimer(); // Clear any existing timer
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay();
+        
+        if (timeLeft <= 0) {
+            stopTimer();
+            // Auto-advance to next round when time runs out
+            document.getElementById('next-round-btn').style.display = 'block';
+        }
+    }, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+}
+
+function updateTimerDisplay() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    const timerElement = document.getElementById('timer');
+    timerElement.textContent = timeString;
+    
+    timerElement.className = 'stat-value timer-value';
+    if (timeLeft <= 10) {
+        timerElement.classList.add('danger');
+    } else if (timeLeft <= 30) {
+        timerElement.classList.add('warning');
+    }
+}
+
 async function nextRound() {
+    stopTimer();
     const response = await fetch(`/api/lobby/${lobbyId}/next-round`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
