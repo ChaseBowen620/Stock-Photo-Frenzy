@@ -495,8 +495,13 @@ def submit_word(lobby_id):
     revealed_words = json.loads(lobby.revealed_words) if lobby.revealed_words else []
     word_owners = json.loads(lobby.word_owners) if lobby.word_owners else {}
     
-    # Check if word is in title
-    found_words = [w for w in title_words if w == word]
+    # Check if word is in title AND is actually hidden (not already visible)
+    # In easy mode, only words in easy_mode_hidden_words should be guessable
+    easy_mode_hidden_words = image_data.get('easy_mode_hidden_words', [])
+    words_to_hide = easy_mode_hidden_words if easy_mode_hidden_words else title_words
+    
+    # Only allow guessing words that are actually hidden
+    found_words = [w for w in words_to_hide if w == word and w not in revealed_words]
     is_correct = len(found_words) > 0
     
     # Get guessed words for this participant
@@ -637,6 +642,74 @@ def next_round(lobby_id):
         'active_team': lobby.active_team if (lobby.game_mode == 'competitive' and lobby.current_round < 4) else None,
         'is_free_for_all': lobby.game_mode == 'competitive' and lobby.current_round == 4
     })
+
+@app.route('/api/lobby/<lobby_id>/end', methods=['POST'])
+def end_lobby(lobby_id):
+    """End the lobby (host only) - kicks all players"""
+    lobby = Lobby.query.get(lobby_id)
+    if not lobby:
+        return jsonify({'error': 'Lobby not found'}), 404
+    
+    # Set lobby status to ended
+    lobby.status = 'ended'
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/api/lobby/<lobby_id>/forfeit', methods=['POST'])
+def forfeit_round(lobby_id):
+    """Forfeit the current round (reveal all words)"""
+    lobby = Lobby.query.get(lobby_id)
+    if not lobby:
+        return jsonify({'error': 'Lobby not found'}), 404
+    
+    if lobby.status != 'active':
+        return jsonify({'error': 'Game is not active'}), 400
+    
+    if not lobby.current_image_data:
+        return jsonify({'error': 'No image loaded'}), 400
+    
+    image_data = json.loads(lobby.current_image_data)
+    title_words = image_data.get('title_words', [])
+    easy_mode_hidden_words = image_data.get('easy_mode_hidden_words', [])
+    
+    # Get words that should be revealed
+    words_to_reveal = easy_mode_hidden_words if easy_mode_hidden_words else title_words
+    
+    # Reveal all words
+    revealed_words = list(words_to_reveal)
+    lobby.revealed_words = json.dumps(revealed_words)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'revealed_words': revealed_words})
+
+@app.route('/api/lobby/<lobby_id>/reveal-all', methods=['POST'])
+def reveal_all_words(lobby_id):
+    """Reveal all words (for forfeit/timer)"""
+    lobby = Lobby.query.get(lobby_id)
+    if not lobby:
+        return jsonify({'error': 'Lobby not found'}), 404
+    
+    data = request.json or {}
+    revealed_words = data.get('revealed_words', [])
+    
+    if lobby.current_image_data:
+        image_data = json.loads(lobby.current_image_data)
+        title_words = image_data.get('title_words', [])
+        easy_mode_hidden_words = image_data.get('easy_mode_hidden_words', [])
+        
+        # Get words that should be revealed
+        words_to_reveal = easy_mode_hidden_words if easy_mode_hidden_words else title_words
+        
+        # Ensure all words are revealed
+        for word in words_to_reveal:
+            if word not in revealed_words:
+                revealed_words.append(word)
+        
+        lobby.revealed_words = json.dumps(revealed_words)
+        db.session.commit()
+    
+    return jsonify({'success': True, 'revealed_words': revealed_words})
 
 @app.route('/api/lobby/<lobby_id>/leaderboard')
 def get_leaderboard(lobby_id):

@@ -761,6 +761,56 @@ footer a:hover {
     color: white;
 }
 
+.lobby-ended {
+    text-align: center;
+    padding: 50px 20px;
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    margin: 20px;
+}
+
+.lobby-ended h2 {
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+}
+
+.lobby-ended p {
+    margin-bottom: 30px;
+    font-size: 1.1rem;
+}
+
+.join-new-game {
+    margin-top: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.join-new-game h3 {
+    margin-bottom: 15px;
+    font-size: 1.3rem;
+}
+
+.join-new-game input {
+    width: 100%;
+    max-width: 300px;
+    padding: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    font-size: 1.1rem;
+    text-align: center;
+    text-transform: uppercase;
+    margin-bottom: 15px;
+    background: white;
+    color: #333;
+}
+
+.join-new-game button {
+    width: 100%;
+    max-width: 300px;
+}
+
 /* Results */
 .results-container {
     max-width: 600px;
@@ -1095,7 +1145,7 @@ footer a:hover {
 
 .phrase-input-section label {
     display: block;
-    color: white;
+    color: #666;
     margin-bottom: 8px;
     font-weight: 600;
 }
@@ -1110,7 +1160,7 @@ footer a:hover {
 }
 
 .phrase-hint {
-    color: rgba(255, 255, 255, 0.8);
+    color: #666;
     font-size: 0.9rem;
     margin-top: 8px;
     font-style: italic;

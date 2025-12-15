@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container">
     <header>
-        <h1><a href="{{ url_for('index') }}" style="color: inherit; text-decoration: none;">Stock Photo Frenzy - Host</a></h1>
+        <h1><a href="{{ url_for('index') }}" id="home-link" style="color: inherit; text-decoration: none;">Stock Photo Frenzy - Host</a></h1>
         <p>Round <span id="round-number">1</span> of <span id="max-rounds">5</span></p>
         <div id="mode-indicator" class="mode-indicator"></div>
         <div id="team-indicator" class="team-indicator" style="display: none;"></div>
@@ -58,6 +58,9 @@
         <div class="host-controls">
             <button id="next-round-btn" onclick="nextRound()" class="btn-primary" style="display: none;">
                 Next Round
+            </button>
+            <button id="forfeit-btn" onclick="forfeitRound()" class="btn-forfeit" style="display: none;">
+                Forfeit Round
             </button>
         </div>
     </main>
@@ -360,7 +363,18 @@ function startPolling() {
             }
         }
         
-        revealedWords = data.lobby.revealed_words || [];
+        // Check if lobby was ended
+        if (data.lobby.status === 'ended') {
+            window.location.href = '/';
+            return;
+        }
+        
+        // Only update revealed words if they haven't been manually set (forfeit/timer)
+        // This prevents polling from overriding forfeit/timer reveals
+        const serverRevealedWords = data.lobby.revealed_words || [];
+        if (serverRevealedWords.length >= revealedWords.length) {
+            revealedWords = serverRevealedWords;
+        }
         wordOwners = data.lobby.word_owners || {};
         
         displayHiddenTitle();
@@ -478,7 +492,16 @@ function startTimer() {
                     revealedWords.push(word);
                 }
             });
+            
+            // Update lobby with revealed words
+            fetch(`/api/lobby/${lobbyId}/reveal-all`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ revealed_words: revealedWords })
+            });
+            
             displayHiddenTitle();
+            document.getElementById('forfeit-btn').style.display = 'none';
             // Auto-advance to next round when time runs out
             document.getElementById('next-round-btn').style.display = 'block';
         }
@@ -537,6 +560,49 @@ async function nextRound() {
         console.error('Error advancing to next round:', error);
         alert('Failed to advance to next round. Please try again.');
     }
+}
+
+// Handle host leaving - end the lobby
+document.getElementById('home-link').addEventListener('click', function(e) {
+    e.preventDefault();
+    if (confirm('Are you sure you want to leave? This will end the game for all players.')) {
+        fetch(`/api/lobby/${lobbyId}/end`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(() => {
+            window.location.href = '/';
+        });
+    }
+});
+
+// Handle page unload
+window.addEventListener('beforeunload', function() {
+    fetch(`/api/lobby/${lobbyId}/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+});
+
+function forfeitRound() {
+    stopTimer();
+    // Reveal all words
+    const wordsToReveal = (easyModeHiddenWords.length > 0) ? easyModeHiddenWords : titleWords;
+    wordsToReveal.forEach(word => {
+        if (!revealedWords.includes(word)) {
+            revealedWords.push(word);
+        }
+    });
+    
+    // Update lobby with revealed words
+    fetch(`/api/lobby/${lobbyId}/reveal-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ revealed_words: revealedWords })
+    });
+    
+    displayHiddenTitle();
+    document.getElementById('forfeit-btn').style.display = 'none';
+    document.getElementById('next-round-btn').style.display = 'block';
 }
 
 checkGameStatus();

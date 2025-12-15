@@ -37,9 +37,20 @@
             <div class="guess-input-mobile">
                 <input type="text" id="wordInput" placeholder="Enter a word..." maxlength="20">
                 <button id="submitBtn" onclick="submitWord()" class="btn-submit">Submit</button>
+                <button id="forfeitBtn" onclick="forfeitRound()" class="btn-forfeit">Forfeit</button>
             </div>
             
             <div id="feedback" class="feedback-mobile"></div>
+        </div>
+        
+        <div id="lobby-ended" class="lobby-ended" style="display: none;">
+            <h2>Game Ended</h2>
+            <p>The host has left the game.</p>
+            <div class="join-new-game">
+                <h3>Join a New Game</h3>
+                <input type="text" id="new-lobby-code" placeholder="Enter lobby code..." maxlength="10">
+                <button onclick="joinNewLobby()" class="btn-primary">Join Game</button>
+            </div>
         </div>
     </main>
 </div>
@@ -214,6 +225,15 @@ function startPolling() {
         const response = await fetch(`/api/lobby/${lobbyId}/status`);
         const data = await response.json();
         
+        // Check if lobby was ended
+        if (data.lobby.status === 'ended') {
+            document.getElementById('waiting-screen').style.display = 'none';
+            document.getElementById('not-your-turn').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('lobby-ended').style.display = 'block';
+            return;
+        }
+        
         // Image and title display removed - players should look at host screen
         
         // Update scores
@@ -254,6 +274,30 @@ function startPolling() {
             }
         }
     }, 1000);
+}
+
+function forfeitRound() {
+    // Reveal all words by submitting a forfeit request
+    fetch(`/api/lobby/${lobbyId}/forfeit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player_name: playerName })
+    }).then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('forfeitBtn').disabled = true;
+            showFeedback('Round forfeited! Waiting for next round...', 'error');
+        }
+    });
+}
+
+function joinNewLobby() {
+    const lobbyCode = document.getElementById('new-lobby-code').value.trim().toUpperCase();
+    if (lobbyCode) {
+        window.location.href = `/join/${lobbyCode}`;
+    } else {
+        alert('Please enter a lobby code');
+    }
 }
 
 document.getElementById('wordInput').addEventListener('keypress', function(e) {
