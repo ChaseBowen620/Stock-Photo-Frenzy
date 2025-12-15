@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container">
     <header>
-        <h1>Stock Photo Frenzy</h1>
+        <h1><a href="{{ url_for('index') }}" style="color: inherit; text-decoration: none;">Stock Photo Frenzy</a></h1>
         <p>Round <span id="round-number">1</span> of 5</p>
         <div class="phrase-display" id="phrase-display" style="display: none;">
             <p>Search phrase: <span id="current-phrase"></span></p>
@@ -261,20 +261,24 @@ function forfeitGame() {
     stopTimer();
     
     // Reveal all words
-    titleWords.forEach(word => revealedWords.add(word));
+    const wordsToReveal = easyModeHiddenWords.length > 0 ? easyModeHiddenWords : titleWords;
+    wordsToReveal.forEach(word => revealedWords.add(word));
     displayHiddenTitle();
     
     document.getElementById('forfeitBtn').disabled = true;
     showFeedback('Game forfeited! The title has been revealed.', 'incorrect');
     
-    // Change forfeit button to "Next Round"
-    document.getElementById('forfeitBtn').textContent = 'Next Round';
-    document.getElementById('forfeitBtn').style.background = 'linear-gradient(45deg, #27ae60, #2ecc71)';
-    document.getElementById('forfeitBtn').style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.4)';
-    document.getElementById('forfeitBtn').disabled = false;
-    document.getElementById('forfeitBtn').onclick = function() {
-        startRound();
-    };
+    // Wait a few seconds before allowing next round
+    setTimeout(() => {
+        // Change forfeit button to "Next Round"
+        document.getElementById('forfeitBtn').textContent = 'Next Round';
+        document.getElementById('forfeitBtn').style.background = 'linear-gradient(45deg, #27ae60, #2ecc71)';
+        document.getElementById('forfeitBtn').style.boxShadow = '0 4px 15px rgba(39, 174, 96, 0.4)';
+        document.getElementById('forfeitBtn').disabled = false;
+        document.getElementById('forfeitBtn').onclick = function() {
+            startRound();
+        };
+    }, 3000); // 3 seconds delay
 }
 
 function startTimer() {

@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container">
     <header>
-        <h1>Stock Photo Frenzy - Host</h1>
+        <h1><a href="{{ url_for('index') }}" style="color: inherit; text-decoration: none;">Stock Photo Frenzy - Host</a></h1>
         <p>Round <span id="round-number">1</span> of <span id="max-rounds">5</span></p>
         <div id="mode-indicator" class="mode-indicator"></div>
         <div id="team-indicator" class="team-indicator" style="display: none;"></div>
@@ -471,6 +471,14 @@ function startTimer() {
         
         if (timeLeft <= 0) {
             stopTimer();
+            // Reveal all words when time runs out
+            const wordsToReveal = (easyModeHiddenWords.length > 0) ? easyModeHiddenWords : titleWords;
+            wordsToReveal.forEach(word => {
+                if (!revealedWords.includes(word)) {
+                    revealedWords.push(word);
+                }
+            });
+            displayHiddenTitle();
             // Auto-advance to next round when time runs out
             document.getElementById('next-round-btn').style.display = 'block';
         }
@@ -502,20 +510,32 @@ function updateTimerDisplay() {
 
 async function nextRound() {
     stopTimer();
-    const response = await fetch(`/api/lobby/${lobbyId}/next-round`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    });
-    
-    const data = await response.json();
-    
-    if (data.game_finished) {
-        window.location.href = `/results?lobby=${lobbyId}`;
-    } else {
-        if (pollInterval) {
-            clearInterval(pollInterval);
+    try {
+        const response = await fetch(`/api/lobby/${lobbyId}/next-round`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}) // Explicitly send empty JSON
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
+            throw new Error(`Server error: ${response.status}`);
         }
-        startRound();
+        
+        const data = await response.json();
+        
+        if (data.game_finished) {
+            window.location.href = `/results?lobby=${lobbyId}`;
+        } else {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+            startRound();
+        }
+    } catch (error) {
+        console.error('Error advancing to next round:', error);
+        alert('Failed to advance to next round. Please try again.');
     }
 }
 

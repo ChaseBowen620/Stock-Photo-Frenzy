@@ -567,6 +567,10 @@ def next_round(lobby_id):
     if not lobby:
         return jsonify({'error': 'Lobby not found'}), 404
     
+    # Check if lobby is in the right state
+    if lobby.status not in ['active', 'waiting']:
+        return jsonify({'error': 'Lobby is not in an active state'}), 400
+    
     data = request.json or {}
     
     # If image_data is provided, store it (for starting a round)
@@ -589,8 +593,9 @@ def next_round(lobby_id):
     # Determine max rounds based on mode
     max_rounds = 5  # All modes use 5 rounds now
     
-    # Check if game is finished
-    if lobby.current_round >= max_rounds - 1:  # 0-indexed
+    # Check if game is finished (current_round is 0-indexed, so round 5 is index 4)
+    # After round 5, current_round would be 4, so we check if >= 4 (which means we've completed round 5)
+    if lobby.current_round >= max_rounds - 1:  # 0-indexed: rounds 0-4 (5 rounds total)
         lobby.status = 'finished'
         db.session.commit()
         return jsonify({
