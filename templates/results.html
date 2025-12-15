@@ -53,12 +53,35 @@
             </div>
             {% endif %}
             
+            {% if is_multiplayer %}
+            <div class="join-new-game-section">
+                <h3>Join a New Game</h3>
+                <input type="text" id="new-lobby-code" placeholder="Enter lobby code..." maxlength="10" style="padding: 12px; border: 2px solid #667eea; border-radius: 8px; font-size: 1.1rem; text-align: center; text-transform: uppercase; margin-bottom: 15px; width: 100%; max-width: 300px;">
+                <button onclick="joinNewLobby()" class="btn-primary" style="width: 100%; max-width: 300px;">Join Game</button>
+            </div>
+            {% else %}
             <div class="results-actions">
                 <a href="{{ url_for('index') }}" class="btn-primary">Play Again</a>
-                {% if is_multiplayer %}
-                <a href="{{ url_for('index') }}" class="btn-primary">New Game</a>
-                {% endif %}
             </div>
+            {% endif %}
+            
+            <script>
+            function joinNewLobby() {
+                const lobbyCode = document.getElementById('new-lobby-code').value.trim().toUpperCase();
+                if (lobbyCode) {
+                    window.location.href = `/join/${lobbyCode}`;
+                } else {
+                    alert('Please enter a lobby code');
+                }
+            }
+            
+            // Auto-redirect to join page for multiplayer
+            {% if is_multiplayer %}
+            setTimeout(() => {
+                window.location.href = '/join';
+            }, 3000);
+            {% endif %}
+            </script>
         </div>
     </main>
 </div>

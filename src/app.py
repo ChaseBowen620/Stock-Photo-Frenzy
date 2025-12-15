@@ -99,6 +99,11 @@ def index():
     """Home page"""
     return render_template('index.html')
 
+@app.route('/join')
+def join_page():
+    """Join page with lobby code input"""
+    return render_template('join_lobby.html', lobby=None, is_join_page=True)
+
 @app.route('/lobby', methods=['GET', 'POST'])
 def lobby():
     """Lobby page for multiplayer game"""
@@ -150,17 +155,22 @@ def lobby():
                          join_url=join_url,
                          mode_description=mode_descriptions.get(lobby_obj.game_mode, ''))
 
+@app.route('/join')
 @app.route('/join/<lobby_id>')
-def join_lobby(lobby_id):
-    """Join lobby page - for mobile users scanning QR code"""
-    lobby_obj = Lobby.query.get(lobby_id)
-    if not lobby_obj:
-        return render_template('join_error.html', error="Lobby not found")
-    
-    if lobby_obj.status != 'waiting':
-        return render_template('join_error.html', error="This lobby is no longer accepting players")
-    
-    return render_template('join_lobby.html', lobby=lobby_obj)
+def join_lobby(lobby_id=None):
+    """Join lobby page - for mobile users scanning QR code or entering code"""
+    if lobby_id:
+        lobby_obj = Lobby.query.get(lobby_id)
+        if not lobby_obj:
+            return render_template('join_error.html', error="Lobby not found")
+        
+        if lobby_obj.status != 'waiting':
+            return render_template('join_error.html', error="This lobby is no longer accepting players")
+        
+        return render_template('join_lobby.html', lobby=lobby_obj)
+    else:
+        # Show lobby code input page
+        return render_template('join_lobby.html', lobby=None)
 
 @app.route('/game')
 def game():

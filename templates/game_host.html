@@ -21,6 +21,9 @@
                 <span class="stat-label">Time:</span>
                 <span id="timer" class="stat-value timer-value">1:00</span>
             </div>
+            <div class="stat-banner forfeit-banner">
+                <button id="forfeit-btn" onclick="forfeitRound()" class="btn-forfeit-stat">Forfeit</button>
+            </div>
             <div id="shared-score-banner" class="stat-banner score-banner" style="display: none;">
                 <span class="stat-label">Shared Score:</span>
                 <span id="shared-score" class="stat-value">0</span>
@@ -50,17 +53,9 @@
             <div id="leaderboard-list"></div>
         </div>
         
-        <div id="round-scoreboard" class="round-scoreboard" style="display: none;">
-            <h3>Round Scoreboard</h3>
-            <div id="round-scores-list"></div>
-        </div>
-        
         <div class="host-controls">
             <button id="next-round-btn" onclick="nextRound()" class="btn-primary" style="display: none;">
                 Next Round
-            </button>
-            <button id="forfeit-btn" onclick="forfeitRound()" class="btn-forfeit" style="display: none;">
-                Forfeit Round
             </button>
         </div>
     </main>
@@ -132,8 +127,8 @@ async function startRound() {
     document.getElementById('round-number').textContent = currentRound;
     document.getElementById('round').textContent = `${currentRound}/${maxRounds}`;
     document.getElementById('next-round-btn').style.display = 'none';
+    document.getElementById('forfeit-btn').style.display = 'block';
     document.getElementById('leaderboard').style.display = 'none';
-    document.getElementById('round-scoreboard').style.display = 'none';
     
     // Reset and start timer
     timeLeft = 60;
@@ -369,12 +364,9 @@ function startPolling() {
             return;
         }
         
-        // Only update revealed words if they haven't been manually set (forfeit/timer)
-        // This prevents polling from overriding forfeit/timer reveals
+        // Always update revealed words from server to show immediately when guessed
         const serverRevealedWords = data.lobby.revealed_words || [];
-        if (serverRevealedWords.length >= revealedWords.length) {
-            revealedWords = serverRevealedWords;
-        }
+        revealedWords = serverRevealedWords;
         wordOwners = data.lobby.word_owners || {};
         
         displayHiddenTitle();
@@ -392,10 +384,7 @@ function startPolling() {
         
         if (allWordsRevealed) {
             stopTimer();
-            // Show round scoreboard for Free-for-All
-            if (gameMode === 'free-for-all') {
-                showRoundScoreboard(data.participants);
-            }
+            document.getElementById('forfeit-btn').style.display = 'none';
             document.getElementById('next-round-btn').style.display = 'block';
         }
         
@@ -447,35 +436,7 @@ function updateLeaderboard(participants) {
     document.getElementById('leaderboard').style.display = 'block';
 }
 
-function showRoundScoreboard(participants) {
-    // Calculate round scores (words found this round)
-    const roundScores = participants.map(p => {
-        const roundWords = (p.guessed_words || []).filter(w => 
-            revealedWords.includes(w)
-        );
-        return {
-            name: p.player_name,
-            score: roundWords.length * 10,
-            color: p.player_color
-        };
-    }).sort((a, b) => b.score - a.score);
-    
-    const list = document.getElementById('round-scores-list');
-    let html = '<div class="round-scores-items">';
-    roundScores.forEach((p, index) => {
-        const colorStyle = p.color ? `style="border-left: 4px solid ${p.color};"` : '';
-        html += `
-            <div class="round-score-item" ${colorStyle}>
-                <span class="rank">${index + 1}</span>
-                <span class="name">${p.name}</span>
-                <span class="score">${p.score} pts</span>
-            </div>
-        `;
-    });
-    html += '</div>';
-    list.innerHTML = html;
-    document.getElementById('round-scoreboard').style.display = 'block';
-}
+// Round scoreboard removed - only showing total leaderboard
 
 function startTimer() {
     stopTimer(); // Clear any existing timer

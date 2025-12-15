@@ -116,12 +116,12 @@ function updateLobbyStatus() {
                 setTimeout(() => {
                     window.location.href = `/game?lobby=${lobbyId}`;
                 }, 2000);
-            } else if (participantCount >= 1) {
+            } else if (participantCount >= 2) {
                 startBtn.disabled = false;
-                startHint.textContent = `Ready to start with ${participantCount} player(s)!`;
+                startHint.textContent = `Ready to start with ${participantCount} players!`;
             } else {
                 startBtn.disabled = true;
-                startHint.textContent = 'Waiting for players to join...';
+                startHint.textContent = `Waiting for more players... (${participantCount}/2)`;
             }
         })
         .catch(error => {

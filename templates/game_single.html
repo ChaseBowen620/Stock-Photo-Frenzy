@@ -145,6 +145,9 @@ function setupGame(image) {
     
     document.getElementById('imageDisplay').style.display = 'block';
     document.getElementById('guessingInterface').style.display = 'block';
+    
+    // Reset and focus input field
+    document.getElementById('guessInput').value = '';
     document.getElementById('guessInput').focus();
     
     // Start the timer
@@ -241,6 +244,7 @@ function makeGuess() {
         showFeedback(`"${guess}" is not in the title. Try again!`, 'incorrect');
     }
     
+    // Always reset input field
     document.getElementById('guessInput').value = '';
 }
 

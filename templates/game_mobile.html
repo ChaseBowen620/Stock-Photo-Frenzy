@@ -37,7 +37,6 @@
             <div class="guess-input-mobile">
                 <input type="text" id="wordInput" placeholder="Enter a word..." maxlength="20">
                 <button id="submitBtn" onclick="submitWord()" class="btn-submit">Submit</button>
-                <button id="forfeitBtn" onclick="forfeitRound()" class="btn-forfeit">Forfeit</button>
             </div>
             
             <div id="feedback" class="feedback-mobile"></div>
@@ -188,6 +187,9 @@ async function submitWord() {
         
         const data = await response.json();
         
+        // Always reset input field
+        document.getElementById('wordInput').value = '';
+        
         if (data.error) {
             showFeedback(data.error, 'error');
         } else {
@@ -200,12 +202,12 @@ async function submitWord() {
             } else {
                 showFeedback('Not in the title. Try again!', 'error');
             }
-            
-            document.getElementById('wordInput').value = '';
         }
     } catch (error) {
         console.error('Error submitting word:', error);
         showFeedback('Failed to submit. Please try again.', 'error');
+        // Always reset input field even on error
+        document.getElementById('wordInput').value = '';
     }
 }
 

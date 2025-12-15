@@ -12,6 +12,7 @@
     <main>
         <div class="join-container">
             <div class="join-form">
+                {% if lobby %}
                 <h3>Lobby: {{ lobby.id }}</h3>
                 <div class="form-group">
                     <label for="player-name">Your Name:</label>
@@ -19,13 +20,35 @@
                 </div>
                 <button onclick="joinGame()" class="btn-primary btn-join">Join Game</button>
                 <div id="join-error" class="error-message" style="display: none;"></div>
+                {% else %}
+                <h3>Join a Game</h3>
+                <div class="form-group">
+                    <label for="lobby-code">Lobby Code:</label>
+                    <input type="text" id="lobby-code" placeholder="Enter lobby code..." maxlength="10" style="text-transform: uppercase;" required>
+                </div>
+                <button onclick="goToLobby()" class="btn-primary btn-join">Join</button>
+                <div id="join-error" class="error-message" style="display: none;"></div>
+                {% endif %}
             </div>
         </div>
     </main>
 </div>
 
 <script>
-const lobbyId = '{{ lobby.id }}';
+const lobbyId = '{{ lobby.id if lobby else "" }}';
+
+function goToLobby() {
+    const lobbyCode = document.getElementById('lobby-code').value.trim().toUpperCase();
+    const errorDiv = document.getElementById('join-error');
+    
+    if (!lobbyCode) {
+        errorDiv.textContent = 'Please enter a lobby code';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    window.location.href = `/join/${lobbyCode}`;
+}
 
 function joinGame() {
     const playerName = document.getElementById('player-name').value.trim();
@@ -67,11 +90,19 @@ function joinGame() {
     });
 }
 
+{% if lobby %}
 document.getElementById('player-name').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         joinGame();
     }
 });
+{% else %}
+document.getElementById('lobby-code').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        goToLobby();
+    }
+});
+{% endif %}
 </script>
 {% endblock %}
 
