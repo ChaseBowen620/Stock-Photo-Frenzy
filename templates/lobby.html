@@ -42,22 +42,14 @@
                         <div class="loading-text">Loading participants...</div>
                     </div>
                     
-                    {% if lobby.game_mode == 'competitive' %}
                     <div id="phrase-input-section" class="phrase-input-section" style="display: none;">
-                        <h4>Team Phrases</h4>
-                        <div class="team-phrase-inputs">
-                            <div class="team-phrase red-team">
-                                <label>Red Team Phrase (for Blue Team):</label>
-                                <input type="text" id="red-team-phrase" placeholder="Enter phrase..." maxlength="50">
-                            </div>
-                            <div class="team-phrase blue-team">
-                                <label>Blue Team Phrase (for Red Team):</label>
-                                <input type="text" id="blue-team-phrase" placeholder="Enter phrase..." maxlength="50">
-                            </div>
+                        <h4>Search Phrase (Optional)</h4>
+                        <div class="form-group">
+                            <label for="game-phrase">Enter a search phrase for all rounds:</label>
+                            <input type="text" id="game-phrase" placeholder="e.g., 'sunset beach', 'city skyline'..." maxlength="50">
                         </div>
-                        <p class="phrase-hint">Each team enters a phrase that will be used to find photos for the other team</p>
+                        <p class="phrase-hint">Leave empty for random photos</p>
                     </div>
-                    {% endif %}
                     
                     <div class="start-game-section">
                         <button id="start-game-btn" onclick="startGame()" class="btn-primary btn-start" disabled>
@@ -119,9 +111,12 @@ function updateLobbyStatus() {
             } else if (participantCount >= 2) {
                 startBtn.disabled = false;
                 startHint.textContent = `Ready to start with ${participantCount} players!`;
+                // Show phrase input when ready to start
+                document.getElementById('phrase-input-section').style.display = 'block';
             } else {
                 startBtn.disabled = true;
                 startHint.textContent = `Waiting for more players... (${participantCount}/2)`;
+                document.getElementById('phrase-input-section').style.display = 'none';
             }
         })
         .catch(error => {
@@ -134,9 +129,8 @@ function startGame() {
         return;
     }
     
-    // Get team phrases for competitive mode
-    const redPhrase = document.getElementById('red-team-phrase')?.value.trim() || '';
-    const bluePhrase = document.getElementById('blue-team-phrase')?.value.trim() || '';
+    // Get game phrase for all modes
+    const gamePhrase = document.getElementById('game-phrase')?.value.trim() || '';
     
     fetch(`/api/lobby/${lobbyId}/start`, {
         method: 'POST',
@@ -144,8 +138,7 @@ function startGame() {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            red_team_phrase: redPhrase,
-            blue_team_phrase: bluePhrase
+            game_phrase: gamePhrase
         })
     })
     .then(response => response.json())

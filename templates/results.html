@@ -75,11 +75,15 @@
                 }
             }
             
-            // Auto-redirect to join page for multiplayer
+            // Auto-redirect to join page for multiplayer (mobile players only, not host)
             {% if is_multiplayer %}
-            setTimeout(() => {
-                window.location.href = '/join';
-            }, 3000);
+            // Check if this is a mobile device
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+            if (isMobile) {
+                setTimeout(() => {
+                    window.location.href = '/join';
+                }, 3000);
+            }
             {% endif %}
             </script>
         </div>

@@ -414,10 +414,12 @@ def start_lobby_game(lobby_id):
     if len(participants) < 1:
         return jsonify({'error': 'Need at least one participant to start'}), 400
     
-    # Get team phrases for competitive mode
+    # Get game phrase for all modes
     data = request.json or {}
-    red_phrase = data.get('red_team_phrase', '').strip()
-    blue_phrase = data.get('blue_team_phrase', '').strip()
+    game_phrase = data.get('game_phrase', '').strip()
+    
+    # Store game phrase
+    lobby.game_phrase = game_phrase if game_phrase else None
     
     # For Competitive mode, select team captains
     if lobby.game_mode == 'competitive':
@@ -438,13 +440,6 @@ def start_lobby_game(lobby_id):
         
         lobby.team_captains = json.dumps([c.player_name for c in captains])
         lobby.active_team = 'red'  # Start with red team
-        
-        # Store team phrases
-        lobby.red_team_phrase = red_phrase if red_phrase else None
-        lobby.blue_team_phrase = blue_phrase if blue_phrase else None
-        
-        # Randomly choose which team's phrase to use for round 5 (3 photos vs 2 photos)
-        lobby.round5_team = random.choice(['red', 'blue'])
     
     # Start the game
     from datetime import datetime
@@ -570,9 +565,9 @@ def submit_word(lobby_id):
         'is_correct': is_correct,
         'points': len(found_words) * 10 if is_correct else 0,
         'revealed_words': revealed_words,
-        'word_owners': word_owners if lobby.game_mode == 'free-for-all' else {},
+        'word_owners': word_owners if (lobby.game_mode == 'free-for-all' or (lobby.game_mode == 'competitive' and lobby.current_round >= 4)) else {},
         'score': participant.score if lobby.game_mode != 'cooperative' else lobby.shared_score,
-        'player_color': participant.player_color if lobby.game_mode == 'free-for-all' else None
+        'player_color': participant.player_color if (lobby.game_mode == 'free-for-all' or (lobby.game_mode == 'competitive' and lobby.current_round >= 4)) else None
     })
 
 @app.route('/api/lobby/<lobby_id>/next-round', methods=['POST'])

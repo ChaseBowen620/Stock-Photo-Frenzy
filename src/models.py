@@ -21,9 +21,10 @@ class Lobby(db.Model):
     team_captains = db.Column(db.Text)  # JSON array of two player names for competitive mode
     active_team = db.Column(db.String(10), nullable=True)  # 'red' or 'blue' for competitive mode
     shared_score = db.Column(db.Integer, default=0)  # For cooperative mode
-    red_team_phrase = db.Column(db.String(100), nullable=True)  # Phrase for red team's photos
-    blue_team_phrase = db.Column(db.String(100), nullable=True)  # Phrase for blue team's photos
-    round5_team = db.Column(db.String(10), nullable=True)  # Which team's phrase to use for round 5 ('red' or 'blue')
+    game_phrase = db.Column(db.String(100), nullable=True)  # Phrase for all rounds (optional)
+    red_team_phrase = db.Column(db.String(100), nullable=True)  # Deprecated - kept for backwards compatibility
+    blue_team_phrase = db.Column(db.String(100), nullable=True)  # Deprecated - kept for backwards compatibility
+    round5_team = db.Column(db.String(10), nullable=True)  # Deprecated - kept for backwards compatibility
     
     # Relationships
     participants = db.relationship('LobbyParticipant', backref='lobby', lazy=True, cascade='all, delete-orphan')
@@ -70,6 +71,7 @@ class Lobby(db.Model):
             'team_captains': team_captains_list,
             'active_team': self.active_team,
             'shared_score': self.shared_score,
+            'game_phrase': self.game_phrase,
             'red_team_phrase': self.red_team_phrase,
             'blue_team_phrase': self.blue_team_phrase,
             'round5_team': self.round5_team

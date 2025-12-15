@@ -165,74 +165,10 @@ async function startRound() {
         
         let imageUrl = `/api/get-image?difficulty=${difficulty}`;
         
-        // For competitive mode, use team phrases
-        if (gameMode === 'competitive') {
-            if (currentRound === 5) {
-                // Round 5: Get photos from both team phrases, then randomly select one
-                const redPhrase = lobbyData.lobby.red_team_phrase;
-                const bluePhrase = lobbyData.lobby.blue_team_phrase;
-                
-                // Randomly choose which team gets 3 photos and which gets 2
-                const redGets3 = Math.random() < 0.5;
-                const redPerPage = redGets3 ? 3 : 2;
-                const bluePerPage = redGets3 ? 2 : 3;
-                
-                try {
-                    let allImages = [];
-                    
-                    // Fetch from red team
-                    if (redPhrase) {
-                        try {
-                            const redResponse = await fetch(`/api/get-image?difficulty=${difficulty}&query=${encodeURIComponent(redPhrase)}&per_page=${redPerPage}`);
-                            const redData = await redResponse.json();
-                            if (redData.success && redData.images) {
-                                allImages = allImages.concat(redData.images);
-                            }
-                        } catch (e) {
-                            console.log('Error fetching red team photos, continuing...');
-                        }
-                    }
-                    
-                    // Fetch from blue team
-                    if (bluePhrase) {
-                        try {
-                            const blueResponse = await fetch(`/api/get-image?difficulty=${difficulty}&query=${encodeURIComponent(bluePhrase)}&per_page=${bluePerPage}`);
-                            const blueData = await blueResponse.json();
-                            if (blueData.success && blueData.images) {
-                                allImages = allImages.concat(blueData.images);
-                            }
-                        } catch (e) {
-                            console.log('Error fetching blue team photos, continuing...');
-                        }
-                    }
-                    
-                    if (allImages.length > 0) {
-                        const randomImage = allImages[Math.floor(Math.random() * allImages.length)];
-                        setupGame(randomImage);
-                    } else {
-                        // Fallback to random
-                        const fallbackResponse = await fetch(`/api/get-image?difficulty=${difficulty}`);
-                        const fallbackData = await fallbackResponse.json();
-                        if (fallbackData.error) throw new Error(fallbackData.error);
-                        setupGame(fallbackData.image);
-                    }
-                } catch (error) {
-                    console.error('Error in round 5 image selection:', error);
-                    // Fallback to random
-                    const fallbackResponse = await fetch(`/api/get-image?difficulty=${difficulty}`);
-                    const fallbackData = await fallbackResponse.json();
-                    if (fallbackData.error) throw new Error(fallbackData.error);
-                    setupGame(fallbackData.image);
-                }
-                return; // Exit early for round 5
-            } else {
-                // Rounds 1-4: Use the opposite team's phrase
-                const activeTeam = lobbyData.lobby.active_team;
-                const phrase = activeTeam === 'red' ? lobbyData.lobby.blue_team_phrase : lobbyData.lobby.red_team_phrase;
-                if (phrase) {
-                    imageUrl += `&query=${encodeURIComponent(phrase)}`;
-                }
-            }
+        // Use game phrase for all modes if provided
+        const gamePhrase = lobbyData.lobby.game_phrase;
+        if (gamePhrase) {
+            imageUrl += `&query=${encodeURIComponent(gamePhrase)}`;
         }
         
         const response = await fetch(imageUrl);
@@ -296,13 +232,9 @@ function displayHiddenTitle() {
     allWords.forEach((word) => {
         if (titleWords.includes(word)) {
             if (revealedWords.includes(word)) {
-                // Word is revealed - check if we need to color it (Free-for-All mode or Competitive round 5)
-                if ((gameMode === 'free-for-all' || (gameMode === 'competitive' && currentRound === 5)) && wordOwners[word]) {
-                    // We'll get participant info from polling, but for now use a placeholder
-                    // The actual coloring will be done in the polling function
-                    const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
-                    displayTitle = displayTitle.replace(wordRegex, word);
-                }
+                // Word is revealed - will be colored in the highlighting section below
+                const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
+                displayTitle = displayTitle.replace(wordRegex, word);
             } else {
                 // Word is hidden - check if easy mode
                 if (difficulty === 'easy' && !easyModeHiddenWords.includes(word)) {
@@ -316,10 +248,13 @@ function displayHiddenTitle() {
         }
     });
     
-    // Apply color highlighting if needed
-    if ((gameMode === 'free-for-all' || (gameMode === 'competitive' && currentRound === 5)) && Object.keys(wordOwners).length > 0) {
-        // Get participant colors from current state
-        fetch(`/api/lobby/${lobbyId}/status`).then(r => r.json()).then(data => {
+    // Apply color highlighting if needed (Free-for-All or Competitive Round 5)
+    // Check current round from lobby status
+    fetch(`/api/lobby/${lobbyId}/status`).then(r => r.json()).then(data => {
+        const currentRoundNum = data.lobby.current_round || 0;
+        const isRound5 = currentRoundNum === 4; // 0-indexed, so round 5 is index 4
+        
+        if ((gameMode === 'free-for-all' || (gameMode === 'competitive' && isRound5)) && Object.keys(wordOwners).length > 0) {
             let highlightedTitle = displayTitle;
             Object.keys(wordOwners).forEach(word => {
                 if (revealedWords.includes(word)) {
@@ -338,10 +273,10 @@ function displayHiddenTitle() {
                 }
             });
             document.getElementById('imageTitle').innerHTML = highlightedTitle;
-        });
-    } else {
-        document.getElementById('imageTitle').innerHTML = displayTitle;
-    }
+        } else {
+            document.getElementById('imageTitle').innerHTML = displayTitle;
+        }
+    });
 }
 
 function startPolling() {
@@ -367,7 +302,13 @@ function startPolling() {
         // Always update revealed words from server to show immediately when guessed
         const serverRevealedWords = data.lobby.revealed_words || [];
         revealedWords = serverRevealedWords;
-        wordOwners = data.lobby.word_owners || {};
+        
+        // Update word owners for highlighting (Free-for-All or Competitive Round 5)
+        const currentRoundNum = data.lobby.current_round || 0;
+        const isRound5 = currentRoundNum === 4;
+        if (gameMode === 'free-for-all' || (gameMode === 'competitive' && isRound5)) {
+            wordOwners = data.lobby.word_owners || {};
+        }
         
         displayHiddenTitle();
         
